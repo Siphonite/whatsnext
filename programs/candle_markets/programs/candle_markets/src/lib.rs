@@ -50,15 +50,74 @@ pub mod candle_markets {
     }
 
     // ---------------------------------------------------------
-    //  STEP 5 — PLACE BET (IMPLEMENT NEXT)
+    //  STEP 5 — PLACE BET (IMPLEMENTATION DONE)
     // ---------------------------------------------------------
-    pub fn place_bet(
-        ctx: Context<PlaceBet>,
-        side: BetSide,
-        amount: u64,
-    ) -> Result<()> {
-        Ok(())
+pub fn place_bet(
+    ctx: Context<PlaceBet>,
+    side: BetSide,
+    amount: u64,
+) -> Result<()> {
+    let market = &mut ctx.accounts.market;
+    let user_bet = &mut ctx.accounts.user_bet;
+    let user = &ctx.accounts.user;
+
+    // -----------------------------------------------------
+    // 1. Validate time (cannot bet after lock_time)
+    // -----------------------------------------------------
+    let now = Clock::get()?.unix_timestamp;
+    require!(now < market.lock_time, CandleError::MarketLocked);
+
+    // -----------------------------------------------------
+    // 2. Prevent double-betting
+    // (PDA is created on first bet; if it exists, Anchor would fail)
+    // -----------------------------------------------------
+    require!(!user_bet.claimed, CandleError::Unauthorized);
+
+    // -----------------------------------------------------
+    // 3. Determine weight tier based on elapsed time
+    // -----------------------------------------------------
+    let elapsed = now - market.start_time; // seconds
+    let weight: u64 = if elapsed < 3600 {
+        100   // 1.0x
+    } else if elapsed < 7200 {
+        70    // 0.7x
+    } else if elapsed < 10800 {
+        50    // 0.5x
+    } else {
+        20    // 0.2x
+    };
+
+    // -----------------------------------------------------
+    // 4. Calculate effective stake
+    // -----------------------------------------------------
+    let effective_stake: u64 = amount * weight / 100;
+
+    // -----------------------------------------------------
+    // 5. Update pools based on side
+    // -----------------------------------------------------
+    match side {
+        BetSide::Green => {
+            market.green_pool_weighted += effective_stake;
+        }
+        BetSide::Red => {
+            market.red_pool_weighted += effective_stake;
+        }
     }
+
+    // -----------------------------------------------------
+    // 6. Save user bet state
+    // -----------------------------------------------------
+    user_bet.user = user.key();
+    user_bet.market = market.key();
+    user_bet.side = side;
+    user_bet.amount = amount;
+    user_bet.weight = weight;
+    user_bet.effective_stake = effective_stake;
+    user_bet.claimed = false;
+
+    Ok(())
+}
+
 
     // ---------------------------------------------------------
     //  STEP 7 — SETTLE MARKET (IMPLEMENT LATER)
@@ -116,7 +175,11 @@ pub struct PlaceBet<'info> {
         init,
         payer = user,
         space = UserBetAccount::LEN,
-        seeds = [b"bet", user.key().as_ref(), market.key().as_ref()],
+        seeds = [
+            b"bet".as_ref(),
+            user.key().as_ref(),
+            market.key().as_ref()
+        ],
         bump
     )]
     pub user_bet: Account<'info, UserBetAccount>,
@@ -126,6 +189,7 @@ pub struct PlaceBet<'info> {
 
     pub system_program: Program<'info, System>,
 }
+
 
 #[derive(Accounts)]
 pub struct SettleMarket<'info> {
