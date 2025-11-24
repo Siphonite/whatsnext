@@ -85,12 +85,17 @@ pub mod candle_markets {
 //
 
 #[derive(Accounts)]
+#[instruction(asset: String, open_price: u64, start_time: i64, end_time: i64, market_id: u64)]
 pub struct CreateMarket<'info> {
+
     #[account(
         init,
         payer = authority,
         space = MarketAccount::LEN,
-        seeds = [b"market", market_id.to_le_bytes().as_ref()],
+        seeds = [
+            b"market".as_ref(), 
+            &market_id.to_le_bytes()
+        ],
         bump
     )]
     pub market: Account<'info, MarketAccount>,
@@ -100,6 +105,7 @@ pub struct CreateMarket<'info> {
 
     pub system_program: Program<'info, System>,
 }
+
 
 #[derive(Accounts)]
 pub struct PlaceBet<'info> {
