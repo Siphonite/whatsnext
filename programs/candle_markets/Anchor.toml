@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-candle_markets = "Hg7BMe7yteVPB8E5pwdjsAVQhfc9gFHy5tbbbZixZaXU"
+candle_markets = "ELwxnoPjmwTRFUwTdsCqCrUjeFqsaUJKwLiNe2xjkQqv"
 
 [registry]
 url = "https://api.apr.dev"
