@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
 pub mod state;
-
 use state::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWxqSWVR79zxR4Cw3Q8M3DT6sGzX");
@@ -10,46 +9,79 @@ declare_id!("Fg6PaFpoGXkYsidMpWxqSWVR79zxR4Cw3Q8M3DT6sGzX");
 pub mod candle_markets {
     use super::*;
 
+    // ---------------------------------------------------------
+    //  STEP 4 — CREATE MARKET
+    // ---------------------------------------------------------
     pub fn create_market(
         ctx: Context<CreateMarket>,
         asset: String,
         open_price: u64,
         start_time: i64,
         end_time: i64,
+        market_id: u64,
     ) -> Result<()> {
-        // Implementation will be added in Phase 1 Step 4
+        // ───── Validations ─────────────────────────────────────
+        require!(end_time > start_time, CandleError::MarketClosed);
+
+        // Lock market 10 mins before closing
+        let lock_time = end_time - 600; // 600 seconds = 10 minutes
+
+        let market = &mut ctx.accounts.market;
+
+        // ───── Set Market State ────────────────────────────────
+        market.asset = asset;
+        market.market_id = market_id;
+        market.start_time = start_time;
+        market.end_time = end_time;
+        market.lock_time = lock_time;
+        market.open_price = open_price;
+        market.close_price = 0;
+
+        // Virtual liquidity (constant for now)
+        market.virtual_liquidity = 100;
+
+        // Bootstrap pools with virtual liquidity
+        market.green_pool_weighted = market.virtual_liquidity;
+        market.red_pool_weighted = market.virtual_liquidity;
+
+        market.settled = false;
+
         Ok(())
     }
 
+    // ---------------------------------------------------------
+    //  STEP 5 — PLACE BET (IMPLEMENT NEXT)
+    // ---------------------------------------------------------
     pub fn place_bet(
         ctx: Context<PlaceBet>,
         side: BetSide,
         amount: u64,
     ) -> Result<()> {
-        // Implementation will be added in Step 5
         Ok(())
     }
 
+    // ---------------------------------------------------------
+    //  STEP 7 — SETTLE MARKET (IMPLEMENT LATER)
+    // ---------------------------------------------------------
     pub fn settle_market(
         ctx: Context<SettleMarket>,
         close_price: u64,
     ) -> Result<()> {
-        // Implementation will be added in Step 7
         Ok(())
     }
 
-    pub fn claim_reward(
-        ctx: Context<ClaimReward>,
-    ) -> Result<()> {
-        // Implementation will be added in Step 8
+    // ---------------------------------------------------------
+    //  STEP 8 — CLAIM REWARD (IMPLEMENT LATER)
+    // ---------------------------------------------------------
+    pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
         Ok(())
     }
 }
 
 //
-// -----------------------------
-//       ACCOUNT CONTEXTS
-// -----------------------------
+// ───────────────────────────────────────────────────────────────
+//  ACCOUNT CONTEXTS
+// ───────────────────────────────────────────────────────────────
 //
 
 #[derive(Accounts)]
@@ -58,7 +90,7 @@ pub struct CreateMarket<'info> {
         init,
         payer = authority,
         space = MarketAccount::LEN,
-        seeds = [b"market", market_id_seed().as_ref()],
+        seeds = [b"market", market_id.to_le_bytes().as_ref()],
         bump
     )]
     pub market: Account<'info, MarketAccount>,
@@ -110,9 +142,9 @@ pub struct ClaimReward<'info> {
 }
 
 //
-// -----------------------------
-//       ERROR HANDLING
-// -----------------------------
+// ───────────────────────────────────────────────────────────────
+//  ERRORS
+// ───────────────────────────────────────────────────────────────
 //
 
 #[error_code]
@@ -131,15 +163,4 @@ pub enum CandleError {
     InvalidWeight,
     #[msg("Unauthorized action")]
     Unauthorized,
-}
-
-//
-// -----------------------------
-//       PDA SEED HELPERS
-// -----------------------------
-//
-
-pub fn market_id_seed() -> [u8; 8] {
-    // temporary placeholder – updated during instruction implementation
-    0u64.to_le_bytes()
 }
