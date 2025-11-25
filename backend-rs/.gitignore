@@ -1,0 +1,12 @@
+# Rust build folders
+/target
+**/target
+
+# Generated cargo files
+Cargo.lock
+
+# Logs
+*.log
+
+# Environment
+.env

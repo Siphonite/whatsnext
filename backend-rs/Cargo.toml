@@ -26,4 +26,4 @@ solana-client = "1.18.0"
 dotenv = "0.15"
 
 # Cron scheduling
-tokio-cron-scheduler = "0.7"
+tokio-cron-scheduler = "0.10"
