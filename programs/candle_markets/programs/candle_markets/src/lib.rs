@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 pub mod state;
 use state::*;
 
-declare_id!("Fg6PaFpoGXkYsidMpWxqSWVR79zxR4Cw3Q8M3DT6sGzX");
+declare_id!("ELwxnoPjmwTRFUwTdsCqCrUjeFqsaUJKwLiNe2xjkQqv");
 
 #[program]
 pub mod candle_markets {
