@@ -6,6 +6,7 @@ pub struct AppConfig {
     pub rpc_url: String,
     pub program_id: String,
     pub admin_keypair: String,
+    #[allow(dead_code)]
     pub backend_port: u16,
 }
 

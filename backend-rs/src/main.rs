@@ -1,30 +1,28 @@
-use axum::{routing::get, Router};
-use tokio::net::TcpListener;
-
 mod config;
+mod solana_client;
+
+use config::AppConfig;
+use solana_client::SolanaClient;
 
 #[tokio::main]
-async fn main() {
-    // Load environment config
-    let cfg = config::AppConfig::load();
+async fn main() -> anyhow::Result<()> {
+    println!("Starting backend test...");
 
-    println!("Loaded config:");
-    println!("RPC URL: {}", cfg.rpc_url);
-    println!("Program ID: {}", cfg.program_id);
+    let cfg = AppConfig::load();
+    let sol = SolanaClient::new(&cfg)?;
 
-    // Define routes
-    let app = Router::new().route("/", get(root));
+    println!("Program ID: {}", sol.program_id);
 
-    // Bind listener for axum 0.7
-    let listener = TcpListener::bind(("127.0.0.1", cfg.backend_port))
-        .await
-        .unwrap();
+    let now = chrono::Utc::now().timestamp();
+    let sig = sol.create_market_and_send(
+        "SOL/USDT".to_string(),
+        100_000,
+        now,
+        now + 3600,
+        1,
+    )?;
 
-    println!("Backend running on http://127.0.0.1:{}", cfg.backend_port);
+    println!("Transaction: {}", sig);
 
-    axum::serve(listener, app).await.unwrap();
-}
-
-async fn root() -> &'static str {
-    "Rust Backend Online 🚀"
+    Ok(())
 }
