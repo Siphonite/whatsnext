@@ -26,4 +26,7 @@ solana-client = "1.18.0"
 dotenv = "0.15"
 
 # Cron scheduling
-tokio-cron-scheduler = "0.10"
+tokio-cron-scheduler = "0.10" 
+
+# Import on-chain program
+candle_markets = { path = "/home/siphonite/whatsnext/programs/candle_markets/programs/candle_markets" }
