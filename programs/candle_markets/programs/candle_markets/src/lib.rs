@@ -147,9 +147,96 @@ pub fn settle_market(
     // ---------------------------------------------------------
     //  STEP 8 — CLAIM REWARD (IMPLEMENT LATER)
     // ---------------------------------------------------------
-    pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
-        Ok(())
+
+pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
+    let market = &mut ctx.accounts.market;
+    let user_bet = &mut ctx.accounts.user_bet;
+    let user = &ctx.accounts.user;
+
+    // -------------------------------------------------------------
+    // 1. Must be settled
+    // -------------------------------------------------------------
+    require!(market.settled, CandleError::SettlementPending);
+
+    // -------------------------------------------------------------
+    // 2. User must not have already claimed
+    // -------------------------------------------------------------
+    require!(!user_bet.claimed, CandleError::AlreadyClaimed);
+
+    // -------------------------------------------------------------
+    // 3. Determine market result
+    // -------------------------------------------------------------
+    let winning_side = if market.close_price > market.open_price {
+        BetSide::Green
+    } else if market.close_price < market.open_price {
+        BetSide::Red
+    } else {
+        // flat candle → nobody wins (rare but possible)
+        // user gets nothing
+        user_bet.claimed = true;
+        return Ok(());
+    };
+
+    // -------------------------------------------------------------
+    // 4. If user bet on losing side → reward = 0
+    // -------------------------------------------------------------
+    if user_bet.side != winning_side {
+        user_bet.claimed = true;
+        return Ok(());
     }
+
+    // -------------------------------------------------------------
+    // 5. Compute total weighted stakes
+    // Exclude virtual liquidity
+    // -------------------------------------------------------------
+    let virtual_liq = market.virtual_liquidity;
+
+    let (winning_pool, losing_pool) = match winning_side {
+        BetSide::Green => (
+            market.green_pool_weighted,
+            market.red_pool_weighted,
+        ),
+        BetSide::Red => (
+            market.red_pool_weighted,
+            market.green_pool_weighted,
+        ),
+    };
+
+    let total_winning_weighted = winning_pool - virtual_liq;
+    let total_losing_weighted = losing_pool - virtual_liq;
+
+    // If nobody bet on either side (possible edge case)
+    if total_winning_weighted == 0 || total_losing_weighted == 0 {
+        user_bet.claimed = true;
+        return Ok(()); // nothing to pay out
+    }
+
+    // -------------------------------------------------------------
+    // 6. Compute user's payout
+    // payout = (effective_stake / total_winning_weighted) * total_losing_weighted
+    // -------------------------------------------------------------
+    let payout = (user_bet.effective_stake as u128)
+        .checked_mul(total_losing_weighted as u128)
+        .unwrap()
+        .checked_div(total_winning_weighted as u128)
+        .unwrap() as u64;
+
+    // -------------------------------------------------------------
+    // 7. Transfer SOL to user
+    // -------------------------------------------------------------
+    if payout > 0 {
+        **market.to_account_info().try_borrow_mut_lamports()? -= payout;
+        **user.to_account_info().try_borrow_mut_lamports()? += payout;
+    }
+
+    // -------------------------------------------------------------
+    // 8. Mark claimed
+    // -------------------------------------------------------------
+    user_bet.claimed = true;
+
+    Ok(())
+ }
+
 }
 
 //
@@ -225,6 +312,7 @@ pub struct ClaimReward<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 }
+
 
 //
 // ───────────────────────────────────────────────────────────────
