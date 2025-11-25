@@ -120,14 +120,29 @@ pub fn place_bet(
 
 
     // ---------------------------------------------------------
-    //  STEP 7 — SETTLE MARKET (IMPLEMENT LATER)
+    //  STEP 7 — SETTLE MARKET (IMPLEMENTATION DONE)
     // ---------------------------------------------------------
-    pub fn settle_market(
-        ctx: Context<SettleMarket>,
-        close_price: u64,
-    ) -> Result<()> {
-        Ok(())
-    }
+
+pub fn settle_market(
+    ctx: Context<SettleMarket>,
+    close_price: u64,
+) -> Result<()> {
+    let market = &mut ctx.accounts.market;
+
+    // 1) Ensure the market end time has passed
+    let now = Clock::get()?.unix_timestamp;
+    require!(now >= market.end_time, CandleError::MarketNotEnded);
+
+    // 2) Prevent double settlement
+    require!(!market.settled, CandleError::Unauthorized);
+
+    // 3) Set close price and mark as settled
+    market.close_price = close_price;
+    market.settled = true;
+
+    Ok(())
+}
+
 
     // ---------------------------------------------------------
     //  STEP 8 — CLAIM REWARD (IMPLEMENT LATER)
@@ -233,4 +248,6 @@ pub enum CandleError {
     InvalidWeight,
     #[msg("Unauthorized action")]
     Unauthorized,
+    #[msg("Market has not ended yet")]
+    MarketNotEnded, // <--- NEW: used by settle_market
 }
