@@ -17,7 +17,7 @@ reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Anchor client - MUST MATCH ON-CHAIN PROGRAM VERSION
+# Anchor client
 anchor-client = "0.32"
 
 # Solana SDK
@@ -26,14 +26,18 @@ solana-client = "2.0"
 solana-system-interface = "2.0"
 
 # Environment variables
-dotenv = "0.15"
+dotenvy = "0.15"
 
 # Cron scheduling
 tokio-cron-scheduler = "0.10"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # Import on-chain program
 candle_markets = { path = "/home/siphonite/whatsnext/programs/candle_markets/programs/candle_markets" }
 
 # Error handling + timestamps
 anyhow = "1.0"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
