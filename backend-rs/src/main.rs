@@ -1,9 +1,13 @@
 mod config;
 mod scheduler;
 mod solana_client;
+mod oracle;
+
 
 use config::AppConfig;
 use solana_client::SolanaClient;
+use crate::oracle::get_latest_candle;
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -11,6 +15,12 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     tracing::info!("Starting backend...");
+
+    // TEST ORACLE CALL
+
+    let candle = oracle::get_latest_candle("BTCUSDT", 4).await?;
+    println!("Oracle Test Candle: {:?}", candle);
+
 
     let cfg = AppConfig::load();
     let sol = SolanaClient::new(&cfg)?;
