@@ -41,3 +41,4 @@ candle_markets = { path = "/home/siphonite/whatsnext/programs/candle_markets/pro
 # Error handling + timestamps
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+hyper = { version = "1.8.1", features = ["full"] }
