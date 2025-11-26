@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Result};
-use chrono::{Utc, Duration};
+use anyhow::{Result};
+use chrono::Utc;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use std::{
     fs,
@@ -10,13 +10,16 @@ use std::{
 use crate::oracle::get_latest_candle;
 use crate::solana_client::SolanaClient;
 
-// path to store current market_id
+// path to store current market_id (absolute fine; you can change to relative if you prefer)
 const MARKET_ID_PATH: &str = "/home/siphonite/whatsnext/backend-rs/src/data/market_id.txt";
 
 // Load current market_id from file (default 0)
-fn load_market_id() -> Result<u64> {
+pub fn load_market_id() -> Result<u64> {
     if !Path::new(MARKET_ID_PATH).exists() {
-        fs::create_dir_all("data")?;
+        // ensure directory exists
+        if let Some(parent) = Path::new(MARKET_ID_PATH).parent() {
+            fs::create_dir_all(parent)?;
+        }
         fs::write(MARKET_ID_PATH, "0")?;
     }
 
@@ -34,7 +37,7 @@ fn save_market_id(id: u64) -> Result<()> {
 async fn create_market_job(sol: Arc<SolanaClient>) -> Result<()> {
     let asset = "BTCUSDT";
 
-    // Fetch candle
+    // Fetch candle (async)
     let candle = get_latest_candle(asset, 4).await?;
     let open_price = (candle.open * 100.0) as u64; // scale
 
@@ -42,7 +45,7 @@ async fn create_market_job(sol: Arc<SolanaClient>) -> Result<()> {
     let start_time = candle.timestamp;
     let end_time = start_time + (4 * 3600);
 
-    // Determine next market_id
+    // Determine next market_id (sync file read)
     let mut id = load_market_id()?;
     id += 1;
 
@@ -51,18 +54,34 @@ async fn create_market_job(sol: Arc<SolanaClient>) -> Result<()> {
         id, asset, open_price, start_time, end_time
     );
 
-    // Call Solana program
-    let sig = sol.create_market_and_send(
-        asset.to_string(),
-        open_price,
-        start_time,
-        end_time,
-        id,
-    )?;
+    // Call Solana program in blocking thread pool
+    let sol_clone = sol.clone();
+    let asset_string = asset.to_string();
+    let sig_res = tokio::task::spawn_blocking(move || {
+        // This closure runs on the blocking thread pool.
+        sol_clone.create_market_and_send(
+            asset_string,
+            open_price,
+            start_time,
+            end_time,
+            id,
+        )
+    })
+    .await; // await JoinHandle
 
-    tracing::info!("Market {} created. Tx: {}", id, sig);
-
-    save_market_id(id)?;
+    match sig_res {
+        Ok(Ok(sig)) => {
+            tracing::info!("Market {} created. Tx: {}", id, sig);
+            // persist id
+            save_market_id(id)?;
+        }
+        Ok(Err(e)) => {
+            tracing::error!("Failed to create market {}: {:?}", id, e);
+        }
+        Err(join_err) => {
+            tracing::error!("spawn_blocking join error: {:?}", join_err);
+        }
+    }
 
     Ok(())
 }
@@ -85,9 +104,23 @@ async fn settle_market_job(sol: Arc<SolanaClient>) -> Result<()> {
         id, close_price, candle.timestamp
     );
 
-    let sig = sol.settle_market_and_send(id, close_price)?;
+    let sol_clone = sol.clone();
+    let sig_res = tokio::task::spawn_blocking(move || {
+        sol_clone.settle_market_and_send(id, close_price)
+    })
+    .await;
 
-    tracing::info!("Market {} settled. Tx: {}", id, sig);
+    match sig_res {
+        Ok(Ok(sig)) => {
+            tracing::info!("Market {} settled. Tx: {}", id, sig);
+        }
+        Ok(Err(e)) => {
+            tracing::error!("Failed to settle market {}: {:?}", id, e);
+        }
+        Err(join_err) => {
+            tracing::error!("spawn_blocking join error: {:?}", join_err);
+        }
+    }
 
     Ok(())
 }
@@ -96,9 +129,7 @@ async fn settle_market_job(sol: Arc<SolanaClient>) -> Result<()> {
 pub async fn start_scheduler(sol: Arc<SolanaClient>) -> Result<()> {
     let sched = JobScheduler::new().await?;
 
-    // ─────────────────────────────
-    // Create Market every 4 hours
-    // ─────────────────────────────
+    // Create Market every 4 hours (at 0 minutes of the 4-hour block)
     let sol_clone = sol.clone();
     let create_job = Job::new_async("0 0 */4 * * *", move |_uuid, _l| {
         let sol = sol_clone.clone();
@@ -110,9 +141,7 @@ pub async fn start_scheduler(sol: Arc<SolanaClient>) -> Result<()> {
     })?;
     sched.add(create_job).await?;
 
-    // ─────────────────────────────
-    // Settle Market every 4 hours + 10 min
-    // ─────────────────────────────
+    // Settle Market every 4 hours + 10 minutes
     let sol_clone = sol.clone();
     let settle_job = Job::new_async("0 10 */4 * * *", move |_uuid, _l| {
         let sol = sol_clone.clone();
@@ -124,7 +153,7 @@ pub async fn start_scheduler(sol: Arc<SolanaClient>) -> Result<()> {
     })?;
     sched.add(settle_job).await?;
 
-    // Start scheduler
+    // Start scheduler (runs within existing runtime)
     sched.start().await?;
     tracing::info!("Scheduler started: create every 4h, settle every 4h+10m");
 
