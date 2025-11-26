@@ -1,88 +1,132 @@
-use anyhow::Result;
-use chrono::{DateTime, Utc, Timelike};
+use anyhow::{anyhow, Result};
+use chrono::{Utc, Duration};
 use tokio_cron_scheduler::{Job, JobScheduler};
-use serde::Deserialize;
+use std::{
+    fs,
+    path::Path,
+    sync::Arc,
+};
 
-#[derive(Deserialize)]
-struct PriceApiResponse {
-    price: f64,
+use crate::oracle::get_latest_candle;
+use crate::solana_client::SolanaClient;
+
+// path to store current market_id
+const MARKET_ID_PATH: &str = "/home/siphonite/whatsnext/backend-rs/src/data/market_id.txt";
+
+// Load current market_id from file (default 0)
+fn load_market_id() -> Result<u64> {
+    if !Path::new(MARKET_ID_PATH).exists() {
+        fs::create_dir_all("data")?;
+        fs::write(MARKET_ID_PATH, "0")?;
+    }
+
+    let txt = fs::read_to_string(MARKET_ID_PATH)?;
+    Ok(txt.trim().parse::<u64>().unwrap_or(0))
 }
 
-async fn fetch_price_from_api(symbol: &str) -> Result<f64> {
-    // dummy price for now (so no error)
-    Ok(100.0)
+// Save updated market_id
+fn save_market_id(id: u64) -> Result<()> {
+    fs::write(MARKET_ID_PATH, id.to_string())?;
+    Ok(())
 }
 
-// placeholder candle logic
-fn compute_candle_bounds(now: DateTime<Utc>, hours: i64) -> (DateTime<Utc>, DateTime<Utc>) {
-    let start_hour = now.hour() - (now.hour() % (hours as u32));
-    let start = now
-        .with_hour(start_hour).unwrap()
-        .with_minute(0).unwrap()
-        .with_second(0).unwrap()
-        .with_nanosecond(0).unwrap();
+// CREATE MARKET JOB
+async fn create_market_job(sol: Arc<SolanaClient>) -> Result<()> {
+    let asset = "BTCUSDT";
 
-    let end = start + chrono::Duration::hours(hours);
-    (start, end)
-}
+    // Fetch candle
+    let candle = get_latest_candle(asset, 4).await?;
+    let open_price = (candle.open * 100.0) as u64; // scale
 
-async fn create_market_job() -> Result<()> {
-    tracing::info!("Running create_market_job");
+    // Compute times
+    let start_time = candle.timestamp;
+    let end_time = start_time + (4 * 3600);
 
-    let now = Utc::now();
-    let (start, end) = compute_candle_bounds(now, 4);
+    // Determine next market_id
+    let mut id = load_market_id()?;
+    id += 1;
 
-    let price = fetch_price_from_api("BTCUSD").await?;
-    tracing::info!("Fetched price: {}", price);
+    tracing::info!(
+        "Creating market {} for {} | open={} start={} end={}",
+        id, asset, open_price, start_time, end_time
+    );
 
-    // TODO: integrate SolanaClient here
-    tracing::info!("Would call create_market here: start={}, end={}", start, end);
+    // Call Solana program
+    let sig = sol.create_market_and_send(
+        asset.to_string(),
+        open_price,
+        start_time,
+        end_time,
+        id,
+    )?;
+
+    tracing::info!("Market {} created. Tx: {}", id, sig);
+
+    save_market_id(id)?;
 
     Ok(())
 }
 
-async fn settle_market_job() -> Result<()> {
-    tracing::info!("Running settle_market_job");
+// SETTLE MARKET JOB
+async fn settle_market_job(sol: Arc<SolanaClient>) -> Result<()> {
+    let asset = "BTCUSDT";
 
-    let now = Utc::now();
-    let (start, end) = compute_candle_bounds(now, 4);
+    let id = load_market_id()?;
+    if id == 0 {
+        tracing::warn!("No market exists to settle yet.");
+        return Ok(());
+    }
 
-    let price = fetch_price_from_api("BTCUSD").await?;
-    tracing::info!("Fetched close price: {}", price);
+    let candle = get_latest_candle(asset, 4).await?;
+    let close_price = (candle.close * 100.0) as u64;
 
-    // TODO: integrate SolanaClient here
-    tracing::info!("Would call settle_market here: start={}, end={}", start, end);
+    tracing::info!(
+        "Settling market {} | close={} timestamp={}",
+        id, close_price, candle.timestamp
+    );
+
+    let sig = sol.settle_market_and_send(id, close_price)?;
+
+    tracing::info!("Market {} settled. Tx: {}", id, sig);
 
     Ok(())
 }
 
-pub async fn start_scheduler() -> Result<()> {
-    tracing::info!("Starting scheduler...");
-
+// START SCHEDULER
+pub async fn start_scheduler(sol: Arc<SolanaClient>) -> Result<()> {
     let sched = JobScheduler::new().await?;
 
-    let create_job = Job::new_async("0 0 */4 * * *", |_, _| {
-        Box::pin(async {
-            if let Err(e) = create_market_job().await {
-                tracing::error!("create_market_job error: {:?}", e);
+    // ─────────────────────────────
+    // Create Market every 4 hours
+    // ─────────────────────────────
+    let sol_clone = sol.clone();
+    let create_job = Job::new_async("0 0 */4 * * *", move |_uuid, _l| {
+        let sol = sol_clone.clone();
+        Box::pin(async move {
+            if let Err(e) = create_market_job(sol).await {
+                tracing::error!("Create market job failed: {:?}", e);
             }
         })
     })?;
-
-    let settle_job = Job::new_async("0 10 */4 * * *", |_, _| {
-        Box::pin(async {
-            if let Err(e) = settle_market_job().await {
-                tracing::error!("settle_market_job error: {:?}", e);
-            }
-        })
-    })?;
-
     sched.add(create_job).await?;
+
+    // ─────────────────────────────
+    // Settle Market every 4 hours + 10 min
+    // ─────────────────────────────
+    let sol_clone = sol.clone();
+    let settle_job = Job::new_async("0 10 */4 * * *", move |_uuid, _l| {
+        let sol = sol_clone.clone();
+        Box::pin(async move {
+            if let Err(e) = settle_market_job(sol).await {
+                tracing::error!("Settle market job failed: {:?}", e);
+            }
+        })
+    })?;
     sched.add(settle_job).await?;
 
+    // Start scheduler
     sched.start().await?;
-
-    tracing::info!("Scheduler started successfully!");
+    tracing::info!("Scheduler started: create every 4h, settle every 4h+10m");
 
     Ok(())
 }

@@ -3,11 +3,10 @@ mod scheduler;
 mod solana_client;
 mod oracle;
 
+use std::sync::Arc;
 
 use config::AppConfig;
 use solana_client::SolanaClient;
-use crate::oracle::get_latest_candle;
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -16,31 +15,31 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting backend...");
 
-    // TEST ORACLE CALL
+    // -----------------------------------
+    // ORACLE TEST (optional)
+    // -----------------------------------
+    match oracle::get_latest_candle("BTCUSDT", 4).await {
+        Ok(cndl) => println!("Oracle Test Candle: {:?}", cndl),
+        Err(e) => tracing::error!("Oracle test failed: {:?}", e),
+    }
 
-    let candle = oracle::get_latest_candle("BTCUSDT", 4).await?;
-    println!("Oracle Test Candle: {:?}", candle);
-
-
+    // -----------------------------------
+    // LOAD CONFIG + INIT SOL CLIENT
+    // -----------------------------------
     let cfg = AppConfig::load();
-    let sol = SolanaClient::new(&cfg)?;
+    let sol = Arc::new(SolanaClient::new(&cfg)?);
 
     tracing::info!("Program ID: {}", sol.program_id);
 
-    // start cron scheduler (no Arc for now)
-    scheduler::start_scheduler().await?;
+    // -----------------------------------
+    // START SCHEDULER WITH SOL CLIENT
+    // -----------------------------------
+    scheduler::start_scheduler(sol.clone()).await?;
 
-    // TEST CALL
-    let now = chrono::Utc::now().timestamp();
-    let sig = sol.create_market_and_send(
-        "SOL/USDT".to_string(),
-        100_000,
-        now,
-        now + 3600,
-        1,
-    )?;
+    tracing::info!("Backend started. Scheduler running.");
 
-    tracing::info!("Test transaction: {}", sig);
-
-    Ok(())
+    // Keep running forever
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+    }
 }
