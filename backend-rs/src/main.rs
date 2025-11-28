@@ -3,15 +3,17 @@ mod scheduler;
 mod solana_client;
 mod oracle;
 mod routes;
+mod db;
 
 use std::sync::Arc;
-
 use axum::Router;
 use config::AppConfig;
 use solana_client::SolanaClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let pool = db::create_db_pool().await;  // Initialize DB pool
+
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
