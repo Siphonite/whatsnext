@@ -2,6 +2,8 @@ use serde::{Serialize, Deserialize};
 use sqlx::{Pool, Postgres};
 use chrono::{DateTime, Utc};
 use anyhow::Result;
+use bigdecimal::BigDecimal;
+use bigdecimal::FromPrimitive;
 
 //
 // Data Models
@@ -50,6 +52,9 @@ pub async fn insert_market(
     lock_time: DateTime<Utc>,
     open_price: f64,
 ) -> Result<()> {
+    // Convert f64 -> BigDecimal because DB column is NUMERIC
+    let open_bd: BigDecimal = BigDecimal::from_f64(open_price)
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert open_price to BigDecimal"))?;
 
     sqlx::query!(
         r#"
@@ -64,7 +69,7 @@ pub async fn insert_market(
         start_time,
         end_time,
         lock_time,
-        open_price
+        open_bd
     )
     .execute(pool)
     .await?;
@@ -84,6 +89,12 @@ pub async fn insert_bet(
     weight: f64,
     effective_stake: f64,
 ) -> Result<()> {
+    let amount_bd = BigDecimal::from_f64(amount)
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert amount to BigDecimal"))?;
+    let weight_bd = BigDecimal::from_f64(weight)
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert weight to BigDecimal"))?;
+    let stake_bd = BigDecimal::from_f64(effective_stake)
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert effective_stake to BigDecimal"))?;
 
     sqlx::query!(
         r#"
@@ -95,9 +106,9 @@ pub async fn insert_bet(
         wallet,
         market_id,
         side,
-        amount,
-        weight,
-        effective_stake
+        amount_bd,
+        weight_bd,
+        stake_bd
     )
     .execute(pool)
     .await?;
@@ -114,6 +125,8 @@ pub async fn update_market_settlement(
     close_price: f64,
     settled: bool,
 ) -> Result<()> {
+    let close_bd = BigDecimal::from_f64(close_price)
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert close_price to BigDecimal"))?;
 
     sqlx::query!(
         r#"
@@ -123,7 +136,7 @@ pub async fn update_market_settlement(
         WHERE market_id = $1
         "#,
         market_id,
-        close_price,
+        close_bd,
         settled
     )
     .execute(pool)
@@ -140,6 +153,8 @@ pub async fn update_pnl(
     wallet: &str,
     pnl_delta: f64,
 ) -> Result<()> {
+    let pnl_bd = BigDecimal::from_f64(pnl_delta)
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert pnl_delta to BigDecimal"))?;
 
     sqlx::query!(
         r#"
@@ -152,7 +167,7 @@ pub async fn update_pnl(
             last_updated = NOW()
         "#,
         wallet,
-        pnl_delta
+        pnl_bd
     )
     .execute(pool)
     .await?;
