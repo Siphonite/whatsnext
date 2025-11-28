@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use anyhow::Result;
 use bigdecimal::BigDecimal;
 use bigdecimal::FromPrimitive;
+use bigdecimal::ToPrimitive;
+
 
 //
 // Data Models
@@ -173,4 +175,72 @@ pub async fn update_pnl(
     .await?;
 
     Ok(())
+}
+pub async fn get_latest_market(pool: &Pool<Postgres>) -> Result<Market> {
+    let row = sqlx::query!(
+        r#"
+        SELECT 
+            id, market_id, asset, start_time, end_time, lock_time,
+            open_price, close_price, green_pool_weighted, red_pool_weighted,
+            virtual_liquidity, settled, created_at
+        FROM markets
+        ORDER BY id DESC
+        LIMIT 1
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let mkt = Market {
+        id: row.id,
+        market_id: row.market_id,
+        asset: row.asset,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        lock_time: row.lock_time,
+        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
+        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
+        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
+        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
+        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        settled: row.settled,
+        created_at: row.created_at,
+    };
+
+    Ok(mkt)
+}
+
+pub async fn get_market_from_db(pool: &Pool<Postgres>, id: i64) -> Result<Market> {
+    let row = sqlx::query!(
+        r#"
+        SELECT 
+            id, market_id, asset, start_time, end_time, lock_time,
+            open_price, close_price, green_pool_weighted, red_pool_weighted,
+            virtual_liquidity, settled, created_at
+        FROM markets
+        WHERE market_id = $1
+        LIMIT 1
+        "#,
+        id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let mkt = Market {
+        id: row.id,
+        market_id: row.market_id,
+        asset: row.asset,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        lock_time: row.lock_time,
+        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
+        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
+        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
+        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
+        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        settled: row.settled,
+        created_at: row.created_at,
+    };
+
+    Ok(mkt)
 }

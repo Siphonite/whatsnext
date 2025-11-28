@@ -1,20 +1,18 @@
 use axum::{Router, routing::get};
 use std::sync::Arc;
-use crate::solana_client::SolanaClient;
+use crate::state::AppState;
 
 pub mod health;
 pub mod oracle;
 pub mod market;
 
-pub fn create_router(sol: Arc<SolanaClient>) -> Router {
+pub fn create_router(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
-        // Add homepage route
         .route("/", get(homepage))
-
-        // existing routes
         .nest("/health", health::routes())
         .nest("/oracle", oracle::routes())
-        .nest("/market", market::routes(sol))
+        .nest("/market", market::routes())
+        .with_state(state)     // only once, at the root
 }
 
 async fn homepage() -> &'static str {

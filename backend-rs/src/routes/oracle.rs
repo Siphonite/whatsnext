@@ -1,9 +1,11 @@
 use axum::{Router, routing::get, extract::Path, Json};
 use serde_json::json;
+use std::sync::Arc;
 
+use crate::state::AppState;
 use crate::oracle::get_latest_candle;
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/:symbol", get(oracle_handler))
 }
 

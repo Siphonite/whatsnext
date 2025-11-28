@@ -1,7 +1,10 @@
 use axum::{Router, routing::get, Json};
 use serde_json::json;
+use std::sync::Arc;
 
-pub fn routes() -> Router {
+use crate::state::AppState;
+
+pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/", get(health_check))
 }
 
