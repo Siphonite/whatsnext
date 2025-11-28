@@ -19,5 +19,5 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 }
 
 async fn homepage() -> &'static str {
-    "Welcome to What's Next? Backend.\n\nAvailable endpoints:\n  GET /health\n  GET /oracle/:symbol\n  GET /market/current\n  GET /market/:id\n"
+    "Welcome to What's Next? Backend (Multi-Asset).\n\nAvailable endpoints:\n  GET /health\n  GET /market/active (Returns all 9 assets)\n  GET /market/:id\n  GET /market/pnl/:wallet\n  GET /oracle/:symbol\n"
 }

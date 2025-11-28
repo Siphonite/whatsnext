@@ -284,3 +284,76 @@ pub async fn get_expired_unsettled_markets(pool: &Pool<Postgres>) -> Result<Vec<
 
     Ok(markets)
 }
+
+// Fetch ALL currently active markets (for the 3x3 Grid)
+pub async fn get_active_markets(pool: &Pool<Postgres>) -> Result<Vec<Market>> {
+    // Active = Not settled yet.
+    // This should return roughly 9 rows (one per asset).
+    let rows = sqlx::query!(
+        r#"
+        SELECT 
+            id, market_id, asset, start_time, end_time, lock_time,
+            open_price, close_price, green_pool_weighted, red_pool_weighted,
+            virtual_liquidity, settled, created_at
+        FROM markets
+        WHERE settled = false
+        ORDER BY market_id ASC
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let markets = rows.into_iter().map(|row| Market {
+        id: row.id,
+        market_id: row.market_id,
+        asset: row.asset,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        lock_time: row.lock_time,
+        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
+        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
+        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
+        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
+        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        settled: row.settled,
+        created_at: row.created_at,
+    }).collect();
+
+    Ok(markets)
+}
+
+// Fetch PnL for a specific wallet (for the Sidebar)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PnlStats {
+    pub wallet: String,
+    pub total_pnl: f64,
+    pub total_bets: i64,
+}
+
+pub async fn get_user_pnl(pool: &Pool<Postgres>, wallet: &str) -> Result<PnlStats> {
+    let row = sqlx::query!(
+        r#"
+        SELECT wallet, total_pnl, total_bets
+        FROM pnl
+        WHERE wallet = $1
+        "#,
+        wallet
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(r) = row {
+        Ok(PnlStats {
+            wallet: r.wallet,
+            total_pnl: r.total_pnl.map(|v| v.to_f64().unwrap()).unwrap_or(0.0),
+            total_bets: r.total_bets.unwrap_or(0),
+        })
+    } else {
+        // If user has never bet, return 0 stats
+        Ok(PnlStats {
+            wallet: wallet.to_string(),
+            total_pnl: 0.0,
+            total_bets: 0,
+        })
+    }
+}
