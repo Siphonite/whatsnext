@@ -244,3 +244,43 @@ pub async fn get_market_from_db(pool: &Pool<Postgres>, id: i64) -> Result<Market
 
     Ok(mkt)
 }
+
+// NEW FUNCTION: Fetch all markets that are ready to be settled
+pub async fn get_expired_unsettled_markets(pool: &Pool<Postgres>) -> Result<Vec<Market>> {
+    // We query for markets where:
+    // 1. 'settled' is false (we haven't finished it yet)
+    // 2. 'end_time' is in the past (time is up!)
+    let rows = sqlx::query!(
+        r#"
+        SELECT 
+            id, market_id, asset, start_time, end_time, lock_time,
+            open_price, close_price, green_pool_weighted, red_pool_weighted,
+            virtual_liquidity, settled, created_at
+        FROM markets
+        WHERE settled = false 
+        AND end_time <= NOW()
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    // Map the raw SQL rows into our clean 'Market' struct
+    let markets = rows.into_iter().map(|row| Market {
+        id: row.id,
+        market_id: row.market_id,
+        asset: row.asset,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        lock_time: row.lock_time,
+        // Convert BigDecimals/Options to Rust types
+        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
+        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
+        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
+        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
+        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        settled: row.settled,
+        created_at: row.created_at,
+    }).collect();
+
+    Ok(markets)
+}
