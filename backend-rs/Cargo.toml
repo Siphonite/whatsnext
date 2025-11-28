@@ -3,6 +3,10 @@ name = "backend-rs"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "backend_rs"
+path = "src/lib.rs"
+
 [dependencies]
 # Web framework
 axum = "0.7"
