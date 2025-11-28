@@ -8,13 +8,13 @@ name = "backend_rs"
 path = "src/lib.rs"
 
 [dependencies]
-# Web framework
-axum = "0.7"
+# Web framework (latest stable)
+axum = "0.7.9"
 
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.36", features = ["full"] }
 
-# HTTP client for price APIs
+# HTTP client
 reqwest = { version = "0.11", features = ["json"] }
 
 # JSON parsing
@@ -39,15 +39,27 @@ tokio-cron-scheduler = "0.10"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 
-# Import on-chain program
+# Local on-chain program
 candle_markets = { path = "/home/siphonite/whatsnext/programs/candle_markets/programs/candle_markets" }
 
-# Error handling + timestamps
+# Time + error handling
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
-hyper = { version = "1.8.1", features = ["full"] } 
+
+# Hyper 1.x (required by Axum 0.7)
+hyper = { version = "1.3", features = ["full"] }
+
+# Tower (required by Axum service traits)
+tower = "0.4.13"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "migrate", "bigdecimal"] }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "postgres",
+    "chrono",
+    "migrate",
+    "bigdecimal"
+] }
 
+# NUMERIC handling
 bigdecimal = "0.4"
