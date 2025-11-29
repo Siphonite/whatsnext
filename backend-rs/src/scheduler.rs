@@ -46,7 +46,7 @@ async fn create_market_job(
         let candle_res = get_latest_candle(asset, 4).await;
         
         if let Err(e) = candle_res {
-            tracing::error!("❌ Skipping {} due to oracle error: {:?}", asset, e);
+            tracing::error!("Skipping {} due to oracle error: {:?}", asset, e);
             continue; // Skip this asset, try the next one
         }
         let candle = candle_res.unwrap();
@@ -89,7 +89,7 @@ async fn create_market_job(
         // 5. Save to Database
         match sig_res {
             Ok(Ok(sig)) => {
-                tracing::info!("✅ Market {} confirmed on-chain. Tx: {}", id, sig);
+                tracing::info!("Market {} confirmed on-chain. Tx: {}", id, sig);
                 
                 // Only insert into DB if on-chain succeeded
                 match insert_market(
@@ -102,11 +102,11 @@ async fn create_market_job(
                     open_price,
                 ).await {
                     Ok(_) => tracing::info!("💾 Market {} saved to DB", id),
-                    Err(e) => tracing::error!("❌ DB Insert failed for {}: {:?}", id, e),
+                    Err(e) => tracing::error!("DB Insert failed for {}: {:?}", id, e),
                 }
             }
-            Ok(Err(e)) => tracing::error!("❌ On-chain creation failed for {}: {:?}", id, e),
-            Err(e) => tracing::error!("❌ Spawn blocking error: {:?}", e),
+            Ok(Err(e)) => tracing::error!("On-chain creation failed for {}: {:?}", id, e),
+            Err(e) => tracing::error!("Spawn blocking error: {:?}", e),
         }
     }
 
