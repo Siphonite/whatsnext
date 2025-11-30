@@ -1,0 +1,102 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Orbitron:wght@400;700&display=swap");
+
+/* Root container */
+.landing-container {
+  height: 100vh;
+  width: 100vw;
+  background: #000;
+  font-family: "Inter", sans-serif;
+  color: white;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Grid background */
+.landing-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-size: 60px 60px;
+  background-image:
+    linear-gradient(to right, rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
+  animation: pan 20s linear infinite;
+  opacity: 0.4;
+}
+
+/* Content */
+.landing-content {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  top: 20%;
+  animation: fadeIn 1.2s ease-out forwards;
+}
+
+.landing-protocol {
+  color: #67e8f9;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  margin-bottom: 20px;
+  opacity: 0.8;
+}
+
+.landing-title {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 700;
+  font-size: 80px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.landing-title.line2 {
+  color: #67e8f9;
+}
+
+.landing-tagline {
+  color: #9ca3af;
+  margin-top: 25px;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+}
+
+.landing-button {
+  display: inline-block;
+  margin-top: 60px;
+  padding: 14px 40px;
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  color: #67e8f9;
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0.1em;
+  transition: 0.3s ease;
+}
+
+.landing-button:hover {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+  background: rgba(6, 182, 212, 0.1);
+}
+
+/* Footer */
+.landing-footer {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #555;
+  font-family: monospace;
+}
+
+.landing-footer .online {
+  color: #10b981;
+}
+
+/* Animations */
+@keyframes pan {
+  0% { background-position: 0 0; }
+  100% { background-position: 60px 60px; }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
