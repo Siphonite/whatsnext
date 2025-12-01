@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 const TopBar: React.FC = () => {
   const [time, setTime] = useState("00:00:00");
@@ -22,7 +23,8 @@ const TopBar: React.FC = () => {
         <div className="system-status">● SYSTEM OPTIMAL</div>
         <div className="system-clock">{time}</div>
 
-        <button className="wallet-button">CONNECT WALLET</button>
+        {/* REAL WALLET CONNECT BUTTON */}
+        <WalletMultiButton className="wallet-button !rounded-lg !px-4 !py-2 !bg-blue-600 !text-white hover:!bg-blue-700" />
       </div>
     </header>
   );
