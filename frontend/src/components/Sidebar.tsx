@@ -1,36 +1,29 @@
-import React, { useState } from "react";
+import React from "react";
+import "../styles/dashboard.css";
 
 const Sidebar: React.FC = () => {
-  const [collapsed, setCollapsed] = useState(false);
-
   return (
-    <aside
-      className={`dashboard-sidebar ${collapsed ? "sidebar-collapsed" : ""}`}
-    >
-      {/* Header */}
+    <aside className="dashboard-sidebar">
+
+      {/* Sidebar Header */}
       <div className="sidebar-header">
         <h2 className="sidebar-title">WN_PROTOCOL</h2>
-
-        <button
-          className="sidebar-toggle"
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          ☰
-        </button>
+        <button className="sidebar-toggle">☰</button>
       </div>
 
-      {/* Nav Links */}
+      {/* Nav */}
       <nav className="sidebar-nav">
-        <a className="sidebar-link">Live Markets</a>
-        <a className="sidebar-link">Wallet</a>
-        <a className="sidebar-link">Leaderboard</a>
+        <a className="sidebar-link" href="#">Live Markets</a>
+        <a className="sidebar-link" href="#">Wallet</a>
+        <a className="sidebar-link" href="#">Leaderboard</a>
       </nav>
 
-      {/* Balance Section */}
+      {/* Balance */}
       <div className="sidebar-balance">
         <p className="balance-label">BALANCE</p>
         <p className="balance-value">$12,450.00</p>
       </div>
+
     </aside>
   );
 };
