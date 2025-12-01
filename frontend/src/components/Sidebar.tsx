@@ -1,27 +1,60 @@
-import React from "react";
+import React, { useState } from "react";
 import "../styles/dashboard.css";
 
 const Sidebar: React.FC = () => {
-  return (
-    <aside className="dashboard-sidebar">
+  const [collapsed, setCollapsed] = useState(false);
 
-      {/* Sidebar Header */}
+  return (
+    <aside className={`dashboard-sidebar ${collapsed ? "collapsed" : ""}`}>
+      
+      {/* Header */}
       <div className="sidebar-header">
-        <h2 className="sidebar-title">WN_PROTOCOL</h2>
-        <button className="sidebar-toggle">☰</button>
+        {!collapsed && <h2 className="sidebar-title">What's Next</h2>}
+        <button
+          className="sidebar-toggle"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          ☰
+        </button>
       </div>
 
-      {/* Nav */}
+      {/* Navigation */}
       <nav className="sidebar-nav">
-        <a className="sidebar-link" href="#">Live Markets</a>
-        <a className="sidebar-link" href="#">Wallet</a>
-        <a className="sidebar-link" href="#">Leaderboard</a>
+        <a className="sidebar-link" href="#">
+          <span className="icon">📈</span>
+          {!collapsed && <span>Live Markets</span>}
+        </a>
+
+        <a className="sidebar-link" href="#">
+          <span className="icon">💰</span>
+          {!collapsed && <span>PnL</span>}
+        </a>
+
+        <a className="sidebar-link" href="#">
+          <span className="icon">👛</span>
+          {!collapsed && <span>Wallet</span>}
+        </a>
+
+        <a className="sidebar-link" href="#">
+          <span className="icon">🏆</span>
+          {!collapsed && <span>Leaderboard</span>}
+        </a>
+
+        <a className="sidebar-link" href="#">
+          <span className="icon">📜</span>
+          {!collapsed && <span>History</span>}
+        </a>
       </nav>
 
-      {/* Balance */}
-      <div className="sidebar-balance">
-        <p className="balance-label">BALANCE</p>
-        <p className="balance-value">$12,450.00</p>
+      {/* User Widget */}
+      <div className="sidebar-user">
+        <div className="user-avatar">U</div>
+        {!collapsed && (
+          <div className="user-info">
+            <p className="user-label">WALLET BALANCE</p>
+            <p className="user-balance">$12,450.00</p>
+          </div>
+        )}
       </div>
 
     </aside>
