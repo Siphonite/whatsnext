@@ -39,8 +39,9 @@ const AssetCard: React.FC<Props> = ({ asset }) => {
         </div>
 
         <div className="bet-buttons">
-          <button className="bet-high">HIGH</button>
-          <button className="bet-low">LOW</button>
+         <button className="bet-green">GREEN</button>
+        <button className="bet-red">RED</button>
+
         </div>
       </div>
 
