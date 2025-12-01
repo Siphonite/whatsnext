@@ -1,10 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
+import Dashboard from "./pages/Dashboard";
 import React from "react";
-
-const Dashboard: React.FC = () => {
-  return <div className="text-white p-10">Dashboard Coming Soon...</div>;
-};
 
 const App: React.FC = () => {
   return (
