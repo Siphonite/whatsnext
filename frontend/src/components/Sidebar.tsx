@@ -1,8 +1,37 @@
 import React, { useState } from "react";
 import "../styles/dashboard.css";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useEffect } from "react";
 
 const Sidebar: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+
+  const { publicKey } = useWallet();
+  const { connection } = useConnection();
+  const [balance, setBalance] = useState<number | null>(null);
+
+  // Fetch wallet balance dynamically
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!publicKey) {
+        setBalance(null);
+        return;
+      }
+
+      try {
+        const lamports = await connection.getBalance(publicKey);
+        setBalance(lamports / 1_000_000_000); // Lamports → SOL
+      } catch (err) {
+        console.error("Failed to fetch balance:", err);
+      }
+    };
+
+    fetchBalance();
+
+    // Auto-refresh balance every 10 seconds
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [publicKey, connection]);
 
   return (
     <aside className={`dashboard-sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -46,13 +75,22 @@ const Sidebar: React.FC = () => {
         </a>
       </nav>
 
-      {/* User Widget */}
+      {/* User Info */}
       <div className="sidebar-user">
         <div className="user-avatar">U</div>
+
         {!collapsed && (
           <div className="user-info">
             <p className="user-label">WALLET BALANCE</p>
-            <p className="user-balance">$12,450.00</p>
+
+            {/* REAL SOL balance */}
+            <p className="user-balance">
+              {publicKey
+                ? balance !== null
+                  ? `${balance.toFixed(2)} SOL`
+                  : "Loading..."
+                : "Not Connected"}
+            </p>
           </div>
         )}
       </div>
