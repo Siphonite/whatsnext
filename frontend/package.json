@@ -15,7 +15,7 @@
     "@solana/wallet-adapter-wallets": "^0.19.37",
     "@solana/web3.js": "^1.98.4",
     "clsx": "^2.1.1",
-    "lightweight-charts": "^5.0.9",
+    "lightweight-charts": "^3.8.0",
     "lucide-react": "^0.555.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -385,3 +385,38 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+.real-chart-wrapper {
+  width: 100%;
+  height: 120px;
+  position: relative;
+}
+
+.real-chart-container {
+  width: 100%;
+  height: 100%;
+}
+.real-chart-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+} 
+
+.real-chart-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  transform: translate(-50%, -120%);
+  white-space: nowrap;
+} 
+
+.real-chart-tooltip.hidden {
+  display: none;
+}
