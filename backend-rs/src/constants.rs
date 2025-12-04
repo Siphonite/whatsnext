@@ -1,21 +1,16 @@
-// This file contains constant values used throughout the backend application.
-// We use 'pub' so other modules (like the scheduler) can see this.
-// We use 'const' because this list never changes while the app is running.
-// [&str; 9] means an "Array" of "string slices" with a size of 9.
+// ---------------------------------------------------------
+// constants.rs
+// ---------------------------------------------------------
+// This file now defines constants for the single-asset MVP.
+// The entire backend operates only on BTC/USDT markets.
+//
+// All previous multi-asset arrays are removed to simplify
+// the backend and match our single-market architecture.
+// ---------------------------------------------------------
 
-pub const SUPPORTED_ASSETS: [&str; 9] = [
-    // --- Crypto ---
-    "SOL/USDT", 
-    "BTC/USDT", 
-    "ETH/USDT",
-    
-    // --- Forex ---
-    "EUR/USD", 
-    "GBP/USD", 
-    "USD/JPY",
-    
-    // --- Commodities ---
-    "GOLD", 
-    "SILVER", 
-    "OIL"
-];
+/// The single supported asset in the MVP.
+pub const MARKET_ASSET: &str = "BTC/USDT";
+
+/// The Binance-compatible symbol for BTC/USDT.
+/// Example: "BTCUSDT" for klines, price feeds, etc.
+pub const BINANCE_SYMBOL: &str = "BTCUSDT";

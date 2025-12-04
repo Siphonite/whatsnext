@@ -10,12 +10,13 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 async fn oracle_handler(Path(symbol): Path<String>) -> Json<serde_json::Value> {
-    match get_latest_candle(&symbol, 4).await {
+    match get_latest_candle(4).await {
         Ok(candle) => Json(json!({
-            "symbol": symbol,
+            "requested_symbol": symbol,   // what client requested
+            "actual_symbol": "BTC/USDT",  // we only support BTC
             "open": candle.open,
             "high": candle.high,
-            "low": candle.low,
+            "low":  candle.low,
             "close": candle.close,
             "timestamp": candle.timestamp
         })),

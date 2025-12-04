@@ -10,9 +10,12 @@ pub struct AppConfig {
     pub backend_port: u16,
 }
 
+// Single-asset MVP — only BTC/USDT is used everywhere in backend
+pub const MARKET_ASSET: &str = "BTC/USDT";
+
 impl AppConfig {
     pub fn load() -> Self {
-        dotenv().ok(); // load .env into memory
+        dotenv().ok(); // Load .env variables
 
         let rpc_url = env::var("RPC_URL")
             .expect("RPC_URL must be set");

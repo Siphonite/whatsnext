@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 use std::time::Duration as StdDuration;
 
+// Simple in-memory cache
 static CACHE: OnceLock<RwLock<HashMap<String, (CandleData, i64)>>> = OnceLock::new();
 
 fn cache() -> &'static RwLock<HashMap<String, (CandleData, i64)>> {
@@ -18,20 +19,23 @@ fn hours_to_resolution_minutes(hours: i64) -> i64 {
     hours * 60
 }
 
-fn build_tradingview_symbol(symbol: &str) -> String {
-    if symbol.contains(':') {
-        symbol.to_string()
-    } else {
-        format!("BINANCE:{}", symbol)
-    }
-}
-
-pub async fn fetch_tradingview_candle(symbol: &str, candle_hours: i64) -> Result<CandleData> {
-    let tv_symbol = build_tradingview_symbol(symbol);
+/// ----------------------------------------------------------------------------
+/// fetch_tradingview_candle()
+/// Fallback oracle for BTC-only
+/// ----------------------------------------------------------------------------
+/// Notes:
+///  - Only supports BTCUSD
+///  - No multi-asset mapping
+///  - Only called if Binance fails
+///  - Uses Yahoo Finance chart API
+/// ----------------------------------------------------------------------------
+pub async fn fetch_tradingview_candle(candle_hours: i64) -> Result<CandleData> {
+    let tv_symbol = "BTCUSD"; // Only fallback symbol we support now.
     let resolution = hours_to_resolution_minutes(candle_hours);
 
     let key = format!("{}:{}", tv_symbol, resolution);
 
+    // -------- Cache Check (5 second TTL) --------
     {
         let map = cache().read().await;
         if let Some((cndl, ts)) = map.get(&key) {
@@ -42,9 +46,10 @@ pub async fn fetch_tradingview_candle(symbol: &str, candle_hours: i64) -> Result
         }
     }
 
+    // Yahoo URL: BTC-USD
     let url = format!(
         "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval={}m&range=1d",
-        tv_symbol.replace("BINANCE:", ""),
+        "BTC-USD",
         resolution
     );
 
@@ -59,13 +64,13 @@ pub async fn fetch_tradingview_candle(symbol: &str, candle_hours: i64) -> Result
 
     let json: Value = resp.json().await?;
 
-    // Yahoo structure: chart.result[0]
+    // Yahoo format: chart.result[0]
     let result = json["chart"]["result"]
         .as_array()
         .and_then(|arr| arr.get(0))
         .ok_or_else(|| anyhow!("Missing chart.result[0] in Yahoo response"))?;
 
-    let t = result["timestamp"]
+    let timestamps = result["timestamp"]
         .as_array()
         .ok_or_else(|| anyhow!("Missing timestamp"))?;
 
@@ -80,7 +85,7 @@ pub async fn fetch_tradingview_candle(symbol: &str, candle_hours: i64) -> Result
     let c = indicators["close"].as_array().ok_or_else(|| anyhow!("Missing close"))?;
 
     if o.is_empty() {
-        return Err(anyhow!("Yahoo arrays are empty"));
+        return Err(anyhow!("Yahoo price arrays are empty"));
     }
 
     let idx = o.len() - 1;
@@ -90,9 +95,10 @@ pub async fn fetch_tradingview_candle(symbol: &str, candle_hours: i64) -> Result
         high: h[idx].as_f64().unwrap_or(0.0),
         low:  l[idx].as_f64().unwrap_or(0.0),
         close: c[idx].as_f64().unwrap_or(0.0),
-        timestamp: t[idx].as_i64().unwrap_or(0),
+        timestamp: timestamps[idx].as_i64().unwrap_or(0),
     };
 
+    // Cache insert
     {
         let mut map = cache().write().await;
         map.insert(key, (candle.clone(), Utc::now().timestamp()));
