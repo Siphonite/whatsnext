@@ -1,48 +1,28 @@
 import { create } from "zustand";
 
-type Market = {
-  symbol: string;
+type MarketState = {
+  // Fixed single asset
+  asset: string;        // "BTC/USDT"
+  tvSymbol: string;     // "BTCUSDT"
+
+  // Live price for the single asset
+  price: number | null;
+
+  // Setter for updating price
+  setPrice: (newPrice: number) => void;
 };
 
-type State = {
-  markets: Market[];
-  activeAsset: string;
+export const useMarketStore = create<MarketState>((set) => ({
+  // We now support ONLY one asset
+  asset: "BTC/USDT",
+  tvSymbol: "BTCUSDT",  // required by TradingView / Lightweight Charts
 
-  // NEW — Live price store
-  prices: Record<string, number>;
-  setPrice: (symbol: string, price: number) => void;
+  // Live price (initially unknown)
+  price: null,
 
-  setActiveAsset: (asset: string) => void;
-};
-
-export const useMarketStore = create<State>((set) => ({
-  markets: [
-    { symbol: "SOL/USDT" },
-    { symbol: "BTC/USDT" },
-    { symbol: "ETH/USDT" },
-
-    { symbol: "EUR/USD" },
-    { symbol: "GBP/USD" },
-    { symbol: "USD/JPY" },
-
-    { symbol: "GOLD" },
-    { symbol: "SILVER" },
-    { symbol: "OIL" },
-  ],
-
-  activeAsset: "SOL/USDT",
-
-  // NEW — initially empty price map
-  prices: {},
-
-  // NEW — setter that updates just one asset price
-  setPrice: (symbol, price) =>
-    set((state) => ({
-      prices: {
-        ...state.prices,
-        [symbol]: price,
-      },
+  // Update the live price
+  setPrice: (newPrice) =>
+    set(() => ({
+      price: newPrice,
     })),
-
-  setActiveAsset: (asset) => set({ activeAsset: asset }),
 }));

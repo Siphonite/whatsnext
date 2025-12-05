@@ -4,24 +4,21 @@ import {
   ColorType,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { mapToTVSymbol } from "../utils/marketSymbols";
 import { useMarketStore } from "../store/useMarketStore";
 
-interface Props {
-  symbol: string;
-}
-
-const RealChart: React.FC<Props> = ({ symbol }) => {
+const RealChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const candleSeriesRef = useRef<any>(null);
 
-  const { prices } = useMarketStore();
-  const livePrice = prices[symbol];
+  // Single asset from your store
+  const { asset, tvSymbol, price } = useMarketStore();
 
+  // -----------------------------
+  // 1. INIT CHART + LOAD HISTORY
+  // -----------------------------
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Create Chart
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "#0a0a0a" },
@@ -32,12 +29,17 @@ const RealChart: React.FC<Props> = ({ symbol }) => {
         horzLines: { color: "#1f1f1f" },
       },
       width: containerRef.current.clientWidth,
-      height: 120,
+      height: 240, // Increased a bit
       crosshair: { mode: 0 },
+      timeScale: {
+        borderColor: "#222",
+      },
+      rightPriceScale: {
+        borderColor: "#222",
+      },
     });
 
-    // Add Candle Series
-    const candleSeries = (chart as any).addCandlestickSeries({
+    const candleSeries = chart.addCandlestickSeries({
       upColor: "#22c55e",
       downColor: "#ef4444",
       borderUpColor: "#22c55e",
@@ -48,62 +50,93 @@ const RealChart: React.FC<Props> = ({ symbol }) => {
 
     candleSeriesRef.current = candleSeries;
 
-    // Load historical data (Binance)
+    // Fetch historical candles
     const fetchHistorical = async () => {
-      const tvSymbol = mapToTVSymbol(symbol);
+      try {
+        // Prefer BACKEND candles (more accurate for WhatsNext)
+        const backendURL = `/api/prices/${asset}`;
+        const backendRes = await fetch(backendURL);
 
-      const url = `https://api.binance.com/api/v3/klines?symbol=${tvSymbol}&interval=4h&limit=200`;
+        if (backendRes.ok) {
+          const json = await backendRes.json();
 
-      const response = await fetch(url);
-      const data = await response.json();
+          if (json?.candles) {
+            const formatted = json.candles.map((c: any) => ({
+              time: c.timestamp as UTCTimestamp,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            }));
 
-      const formatted = data.map((c: any) => ({
-        time: c[0] / 1000 as UTCTimestamp,
-        open: parseFloat(c[1]),
-        high: parseFloat(c[2]),
-        low: parseFloat(c[3]),
-        close: parseFloat(c[4]),
-      }));
+            candleSeries.setData(formatted);
+            return; // done
+          }
+        }
 
-      candleSeries.setData(formatted);
+        // FALLBACK → Binance historical 4H candles
+        const res = await fetch(
+          `https://api.binance.com/api/v3/klines?symbol=${tvSymbol}&interval=4h&limit=200`
+        );
+        const data = await res.json();
+
+        const converted = data.map((c: any) => ({
+          time: c[0] / 1000 as UTCTimestamp,
+          open: parseFloat(c[1]),
+          high: parseFloat(c[2]),
+          low: parseFloat(c[3]),
+          close: parseFloat(c[4]),
+        }));
+
+        candleSeries.setData(converted);
+      } catch (err) {
+        console.error("Historical candle load failed:", err);
+      }
     };
 
     fetchHistorical();
 
-    // Resize Handler
+    // Responsive Resize
     const resizeObserver = new ResizeObserver(() => {
       chart.applyOptions({
         width: containerRef.current!.clientWidth,
       });
     });
-
     resizeObserver.observe(containerRef.current);
 
     return () => {
       resizeObserver.disconnect();
       chart.remove();
     };
-  }, [symbol]);
+  }, [asset, tvSymbol]);
 
-  // Live Updating Candle
+  // -----------------------------
+  // 2. LIVE PRICE CANDLE UPDATE
+  // -----------------------------
   useEffect(() => {
-    if (!candleSeriesRef.current || !livePrice) return;
+    if (!candleSeriesRef.current || !price) return;
+
+    const timestamp = Math.floor(Date.now() / 1000) as UTCTimestamp;
 
     candleSeriesRef.current.update({
-      time: Math.floor(Date.now() / 1000) as UTCTimestamp,
-      open: livePrice,
-      high: livePrice,
-      low: livePrice,
-      close: livePrice,
+      time: timestamp,
+      open: price,
+      high: price,
+      low: price,
+      close: price,
     });
-  }, [livePrice]);
+  }, [price]);
 
   return (
     <div
       ref={containerRef}
       className="real-chart-container"
-      style={{ width: "100%", height: "120px", position: "relative" }}
-    ></div>
+      style={{
+        width: "100%",
+        height: "240px",
+        position: "relative",
+      }}
+    />
   );
 };
 

@@ -4,53 +4,28 @@ import TopBar from "../components/Topbar";
 import AssetCard from "../components/AssetCard";
 import "../styles/dashboard.css";
 
-// Zustand store
-import { useMarketStore } from "../store/useMarketStore";
-
-// Live price feed hook
+// Live price feed (BTCUSDT only)
 import { usePriceFeed } from "../hooks/usePriceFeed";
 
-// Full asset metadata
-import { SUPPORTED_ASSETS } from "../data/assets";
-
 const Dashboard: React.FC = () => {
-
-  const { markets, activeAsset, setActiveAsset } = useMarketStore();
-
-  // 🔥 Activate live price feed (updates every 5 seconds)
+  // activate single-asset live price feed
   usePriceFeed();
 
   return (
     <div className="dashboard-container">
 
+      {/* LEFT SIDEBAR */}
       <Sidebar />
 
+      {/* MAIN AREA */}
       <main className="dashboard-main">
 
+        {/* TOP BAR */}
         <TopBar />
 
-        <div className="dashboard-grid-wrapper">
-          <div className="dashboard-grid">
-
-            {markets.map((market, index) => {
-              const asset = SUPPORTED_ASSETS.find(
-                (a) => a.pair === market.symbol
-              );
-
-              return (
-                <div
-                  key={index}
-                  onClick={() => setActiveAsset(market.symbol)}
-                  className={`asset-card-wrapper ${
-                    activeAsset === market.symbol ? "active-asset" : ""
-                  }`}
-                >
-                  {asset && <AssetCard asset={asset} />}
-                </div>
-              );
-            })}
-
-          </div>
+        {/* Single Asset Card */}
+        <div className="dashboard-single-wrapper">
+          <AssetCard /> 
         </div>
 
       </main>

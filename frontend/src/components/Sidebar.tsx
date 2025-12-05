@@ -1,44 +1,28 @@
 import React, { useState } from "react";
 import "../styles/dashboard.css";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { useEffect } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useBalance } from "../hooks/useBalance";
 
 const Sidebar: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
 
   const { publicKey } = useWallet();
-  const { connection } = useConnection();
-  const [balance, setBalance] = useState<number | null>(null);
+  const { balance, loading } = useBalance();
 
-  // Fetch wallet balance dynamically
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!publicKey) {
-        setBalance(null);
-        return;
-      }
+  const shorten = (str: string) =>
+    str.slice(0, 4) + "..." + str.slice(-4);
 
-      try {
-        const lamports = await connection.getBalance(publicKey);
-        setBalance(lamports / 1_000_000_000); // Lamports → SOL
-      } catch (err) {
-        console.error("Failed to fetch balance:", err);
-      }
-    };
-
-    fetchBalance();
-
-    // Auto-refresh balance every 10 seconds
-    const interval = setInterval(fetchBalance, 10000);
-    return () => clearInterval(interval);
-  }, [publicKey, connection]);
+  const avatarLetter = publicKey
+    ? shorten(publicKey.toString())[0]
+    : "U";
 
   return (
     <aside className={`dashboard-sidebar ${collapsed ? "collapsed" : ""}`}>
       
-      {/* Header */}
+      {/* HEADER */}
       <div className="sidebar-header">
         {!collapsed && <h2 className="sidebar-title">What's Next</h2>}
+
         <button
           className="sidebar-toggle"
           onClick={() => setCollapsed(!collapsed)}
@@ -47,11 +31,11 @@ const Sidebar: React.FC = () => {
         </button>
       </div>
 
-      {/* Navigation */}
+      {/* NAVIGATION */}
       <nav className="sidebar-nav">
         <a className="sidebar-link" href="#">
           <span className="icon">📈</span>
-          {!collapsed && <span>Live Markets</span>}
+          {!collapsed && <span>Live Market</span>}
         </a>
 
         <a className="sidebar-link" href="#">
@@ -75,21 +59,26 @@ const Sidebar: React.FC = () => {
         </a>
       </nav>
 
-      {/* User Info */}
+      {/* USER SECTION */}
       <div className="sidebar-user">
-        <div className="user-avatar">U</div>
+        <div className="user-avatar">{avatarLetter}</div>
 
         {!collapsed && (
           <div className="user-info">
             <p className="user-label">WALLET BALANCE</p>
 
-            {/* REAL SOL balance */}
+            {/* Balance UI */}
             <p className="user-balance">
-              {publicKey
-                ? balance !== null
-                  ? `${balance.toFixed(2)} SOL`
-                  : "Loading..."
-                : "Not Connected"}
+              {!publicKey
+                ? "Not Connected"
+                : loading
+                ? "Loading..."
+                : `${balance?.toFixed(2)} SOL`}
+            </p>
+
+            {/* Wallet address */}
+            <p className="user-address">
+              {publicKey ? shorten(publicKey.toString()) : ""}
             </p>
           </div>
         )}

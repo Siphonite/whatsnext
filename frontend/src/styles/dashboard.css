@@ -1,19 +1,22 @@
+/* --------------------------------------------------------------- */
+/* GLOBAL UI                                                       */
+/* --------------------------------------------------------------- */
+
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Orbitron:wght@400;700&display=swap");
 
-/* ROOT CONTAINER */
 .dashboard-container {
   display: flex;
-  width: 100%;
   height: 100vh;
+  width: 100%;
   overflow: hidden;
   background: #0b0e14;
   color: #e2e8f0;
   font-family: "Inter", sans-serif;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               SIDEBAR (NEW)                                */
-/* -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------- */
+/* SIDEBAR                                                         */
+/* --------------------------------------------------------------- */
 
 .dashboard-sidebar {
   width: 250px;
@@ -24,25 +27,24 @@
   flex-direction: column;
   justify-content: space-between;
   padding-top: 20px;
-  transition: width 0.3s ease;
+  transition: width 0.28s ease;
 }
 
 .dashboard-sidebar.collapsed {
-  width: 90px;
+  width: 85px;
 }
 
-/* Header */
 .sidebar-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 0 22px;
+  align-items: center;
+  padding: 0 18px;
 }
 
 .sidebar-title {
   font-family: "Orbitron", sans-serif;
-  font-size: 18px;
   color: #67e8f9;
+  font-size: 18px;
   letter-spacing: 1px;
 }
 
@@ -54,37 +56,37 @@
   color: #67e8f9;
 }
 
-/* Navigation */
+/* NAVIGATION */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   padding: 20px 16px;
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 10px;
   border-radius: 8px;
   font-size: 15px;
   color: #9ca3af;
-  transition: 0.2s ease-in-out;
-}
-
-.sidebar-link .icon {
-  font-size: 18px;
-  opacity: 0.8;
+  transition: 0.2s;
 }
 
 .sidebar-link:hover {
   background: rgba(6, 182, 212, 0.12);
   color: #67e8f9;
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.28);
 }
 
-/* Collapsed State */
+.sidebar-link .icon {
+  font-size: 18px;
+  opacity: 0.85;
+}
+
+/* COLLAPSED STATE */
 .dashboard-sidebar.collapsed .sidebar-link {
   justify-content: center;
 }
@@ -93,30 +95,31 @@
   display: none;
 }
 
-/* USER WIDGET */
+/* USER SECTION */
 .sidebar-user {
   padding: 18px;
   border-top: 1px solid rgba(6, 182, 212, 0.12);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .user-avatar {
   width: 40px;
   height: 40px;
-  background: linear-gradient(to bottom right, #67e8f9, #0ea5e9);
   border-radius: 50%;
-  color: black;
+  background: linear-gradient(to bottom right, #67e8f9, #0ea5e9);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: black;
   font-weight: bold;
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
+  gap: 3px;
 }
 
 .user-label {
@@ -125,285 +128,230 @@
 }
 
 .user-balance {
-  font-size: 17px;
+  font-size: 16px;
   color: white;
-  font-weight: 600;
   font-family: monospace;
+  font-weight: 600;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                MAIN CONTENT                                */
-/* -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------- */
+/* MAIN DASHBOARD AREA                                             */
+/* --------------------------------------------------------------- */
 
 .dashboard-main {
   flex: 1;
-  padding: 32px;
+  padding: 28px 34px;
   overflow-y: auto;
-  max-width: 1500px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
-/* TOP BAR */
-.dashboard-topbar {
+/* --------------------------------------------------------------- */
+/* TOPBAR (Updated for Single Asset)                               */
+/* --------------------------------------------------------------- */
+
+.topbar-container {
+  width: 100%;
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  border-radius: 12px;
+  padding: 18px 22px;
+  background: rgba(15, 20, 30, 0.55);
+  backdrop-filter: blur(10px);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 35px;
+  justify-content: space-between;
+  margin-bottom: 26px;
 }
 
 .topbar-title {
   font-family: "Orbitron", sans-serif;
-  font-size: 26px;
-  color: #d5f8ff;
-}
-
-.topbar-subtitle {
-  font-size: 12px;
-  letter-spacing: 1px;
-  color: #6b7280;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-/* SYSTEM BADGE */
-.system-status {
-  padding: 8px 12px;
-  border: 1px solid rgba(6, 182, 212, 0.3);
-  background: rgba(6, 182, 212, 0.12);
-  font-size: 10px;
-  font-family: monospace;
-  color: #0df2a0;
-  border-radius: 6px;
-}
-
-.system-clock {
-  padding: 8px 12px;
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  background: rgba(6, 182, 212, 0.05);
-  font-size: 10px;
-  font-family: monospace;
-  color: #e2e8f0;
-  border-radius: 6px;
-}
-
-/* WALLET BUTTON */
-.wallet-button {
-  padding: 8px 15px;
-  border: 1px solid #67e8f9;
-  background: transparent;
   color: #67e8f9;
+  font-size: 20px;
+}
+
+.lock-status {
+  margin-top: 4px;
   font-size: 12px;
-  letter-spacing: 0.08em;
-  transition: 0.2s;
-  border-radius: 4px;
+  font-family: monospace;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: white;
 }
 
-.wallet-button:hover {
-  background: rgba(6, 182, 212, 0.16);
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+.lock-status.open {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #10b981;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                ASSET CARDS                                 */
-/* -------------------------------------------------------------------------- */
+.lock-status.locked {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+
+.countdown-box {
+  text-align: center;
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 1px;
+}
+
+.countdown-box span {
+  font-size: 11px;
+  color: #a5b4c6;
+}
+
+.countdown-time {
+  font-size: 22px;
+  margin-top: 4px;
+  color: #e5faff;
+}
+
+.market-id-box {
+  text-align: right;
+}
+
+.market-id-box span {
+  font-size: 11px;
+  color: #a5b4c6;
+}
+
+.market-id-box h3 {
+  color: #67e8f9;
+  font-family: "Orbitron", sans-serif;
+  font-size: 18px;
+}
+
+/* --------------------------------------------------------------- */
+/* ASSET CARD (Single Asset Layout)                                */
+/* --------------------------------------------------------------- */
+
+.dashboard-single-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 26px;
+}
 
 .asset-card {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px;
   background: rgba(20, 25, 35, 0.55);
   border: 1px solid rgba(6, 182, 212, 0.15);
-  border-radius: 14px;
-  padding: 20px;
+  padding: 22px;
   backdrop-filter: blur(10px);
   transition: 0.2s;
-
-  width: 100%;
-  max-width: 430px;
-  min-height: 250px;
 }
 
 .asset-card:hover {
-  border-color: rgba(6, 182, 212, 0.4);
+  border-color: rgba(6, 182, 212, 0.45);
 }
 
-/* CARD HEADER */
+/* HEADER */
 .asset-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 12px;
 }
 
 .asset-title {
-  font-family: "Orbitron", sans-serif;
-  font-size: 17px;
   color: #67e8f9;
+  font-family: "Orbitron", sans-serif;
+  font-size: 18px;
 }
 
 .asset-price {
   color: white;
   font-family: monospace;
-  font-size: 14px;
+  font-size: 15px;
 }
 
-/* CHART CONTAINER */
+/* CHART */
 .asset-chart {
-  height: 110px;
+  height: 210px;
   width: 100%;
-  background: rgba(1, 5, 10, 0.55);
-  border: 1px solid rgba(6, 182, 212, 0.15);
-  border-radius: 10px;
-  margin-bottom: 14px;
-  position: relative;
-  overflow: hidden;
+  background: rgba(1, 5, 10, 0.6);
+  border: 1px solid rgba(6, 182, 212, 0.18);
+  border-radius: 12px;
   padding: 10px;
+  margin-bottom: 18px;
+  overflow: hidden;
 }
 
-.chart-svg {
-  width: 100%;
-  height: 80%;
-  opacity: 0.6;
-}
-
-.chart-line {
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
-  animation: dash 5s linear infinite;
-}
-
-@keyframes dash {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.chart-status {
-  position: absolute;
-  left: 50%;
-  bottom: 6px;
-  transform: translateX(-50%);
-  font-size: 10px;
-  color: #6b7280;
-}
-
-/* INPUT FIELD */
+/* INPUT */
 .amount-input {
   position: relative;
 }
 
 .amount-input span {
   position: absolute;
-  left: 8px;
   top: 6px;
+  left: 10px;
   color: #6b7280;
   font-size: 12px;
 }
 
 .amount-input input {
   width: 100%;
-  padding: 6px 10px 6px 22px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(6, 182, 212, 0.2);
-  border-radius: 6px;
+  padding: 8px 12px 8px 26px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(6, 182, 212, 0.22);
+  border-radius: 8px;
   color: white;
   font-family: monospace;
+  font-size: 14px;
 }
 
-/* GREEN/RED BET BUTTONS */
+/* BUTTONS */
 .bet-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .bet-green,
 .bet-red {
-  padding: 10px 0;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 12px 0;
+  border-radius: 10px;
+  font-size: 14px;
   font-family: "Orbitron", sans-serif;
-  transition: 0.2s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  text-align: center;
   cursor: pointer;
+  transition: 0.2s ease;
 }
 
 /* GREEN */
 .bet-green {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.45);
   color: #10b981;
 }
-
 .bet-green:hover {
-  background: rgba(16, 185, 129, 0.2);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
-  color: #12ffaa;
+  background: rgba(16, 185, 129, 0.22);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.55);
 }
 
 /* RED */
 .bet-red {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.45);
   color: #ef4444;
 }
-
 .bet-red:hover {
-  background: rgba(239, 68, 68, 0.2);
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
-  color: #ff6767;
+  background: rgba(239, 68, 68, 0.22);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.55);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               GRID WRAPPER                                 */
-/* -------------------------------------------------------------------------- */
-
-.dashboard-grid-wrapper {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 24px;
-  width: 100%;
-  max-width: 1400px;
-}
-
-@media (min-width: 768px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.real-chart-wrapper {
-  width: 100%;
-  height: 120px;
-  position: relative;
-}
+/* --------------------------------------------------------------- */
+/* CHART CONTAINER FIX                                             */
+/* --------------------------------------------------------------- */
 
 .real-chart-container {
   width: 100%;
   height: 100%;
 }
-.real-chart-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-} 
 
 .real-chart-tooltip {
   position: absolute;
@@ -414,8 +362,7 @@
   font-size: 12px;
   pointer-events: none;
   transform: translate(-50%, -120%);
-  white-space: nowrap;
-} 
+}
 
 .real-chart-tooltip.hidden {
   display: none;

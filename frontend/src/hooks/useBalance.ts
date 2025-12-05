@@ -4,23 +4,36 @@ import { useEffect, useState } from "react";
 export const useBalance = () => {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
+
   const [balance, setBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchBalance = async () => {
+    if (!publicKey) {
+      setBalance(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const lamports = await connection.getBalance(publicKey);
+      setBalance(lamports / 1_000_000_000); // Convert lamports → SOL
+    } catch (err) {
+      console.error("Failed to fetch wallet balance:", err);
+      setBalance(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!publicKey) return setBalance(null);
+    fetchBalance(); // initial load
 
-      const lamports = await connection.getBalance(publicKey);
-      setBalance(lamports / 1_000_000_000); // Convert to SOL
-    };
-
-    fetchBalance();
-
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchBalance, 10000);
+    // Refresh balance automatically
+    const interval = setInterval(fetchBalance, 10_000);
 
     return () => clearInterval(interval);
-  }, [connection, publicKey]);
+  }, [publicKey, connection]);
 
-  return balance;
+  return { balance, loading, refresh: fetchBalance };
 };
