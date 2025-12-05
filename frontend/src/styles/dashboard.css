@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------- */
-/* GLOBAL UI */
+/* GLOBAL UI                                                       */
 /* --------------------------------------------------------------- */
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Orbitron:wght@400;700&display=swap");
@@ -8,14 +8,14 @@
   display: flex;
   height: 100vh;
   width: 100%;
-  overflow: hidden;
+  overflow: hidden; /* Prevents body scroll */
   background: #0b0e14;
   color: #e2e8f0;
   font-family: "Inter", sans-serif;
 }
 
 /* --------------------------------------------------------------- */
-/* SIDEBAR */
+/* SIDEBAR                                                         */
 /* --------------------------------------------------------------- */
 
 .dashboard-sidebar {
@@ -28,6 +28,8 @@
   justify-content: space-between;
   padding-top: 20px;
   transition: width 0.28s ease;
+  flex-shrink: 0; /* Prevent sidebar shrinking */
+  z-index: 20;
 }
 
 .dashboard-sidebar.collapsed {
@@ -135,22 +137,26 @@
 }
 
 /* --------------------------------------------------------------- */
-/* MAIN DASHBOARD AREA */
+/* MAIN DASHBOARD AREA - FIXED TO REMOVE SCROLLBARS                */
 /* --------------------------------------------------------------- */
 
 .dashboard-main {
-  flex: 1;
-  padding: 28px 34px;
-  overflow-y: auto;
+  flex: 1; /* Take remaining width */
+  display: flex;
+  flex-direction: column;
+  padding: 24px 28px; /* Slightly reduced padding */
+  overflow: hidden; /* Stop main scrollbar */
   width: 100%;
+  min-width: 0; /* Essential for nested flex scrolling */
 }
 
 /* --------------------------------------------------------------- */
-/* TOPBAR */
+/* TOPBAR                                                          */
 /* --------------------------------------------------------------- */
 
 .topbar-container {
   width: 100%;
+  flex-shrink: 0; /* Prevent TopBar from shrinking */
   border: 1px solid rgba(6, 182, 212, 0.15);
   border-radius: 12px;
   padding: 18px 22px;
@@ -159,7 +165,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 26px;
+  margin-bottom: 20px;
 }
 
 .topbar-title {
@@ -169,23 +175,26 @@
 }
 
 /* --------------------------------------------------------------- */
-/* ASSET CARD — FIXED FOR FULL WIDTH CHART */
+/* ASSET CARD - EXPANDS TO FILL HEIGHT                             */
 /* --------------------------------------------------------------- */
 
 .dashboard-single-wrapper {
+  flex: 1; /* Grow to fill remaining vertical space */
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  margin-top: 26px;
+  min-height: 0; /* Crucial for children to scroll/resize internally */
 }
 
 .asset-card {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  /* Removed max-width limit to allow full expansion */
-  max-width: 100% !important; 
-  margin: 0 auto;
+  height: 100%; /* Force full height of wrapper */
   border-radius: 16px;
   background: rgba(20, 25, 35, 0.55);
   border: 1px solid rgba(6, 182, 212, 0.15);
-  padding: 26px;
+  padding: 20px;
   backdrop-filter: blur(10px);
   transition: 0.2s;
 }
@@ -196,21 +205,30 @@
 
 /* HEADER */
 .asset-header {
+  flex-shrink: 0; /* Keep header fixed size */
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-/* CHART — FULL SIZE */
+/* CHART - DYNAMIC FLEX HEIGHT */
 .asset-chart {
+  flex: 1; /* This makes the chart take all available space! */
+  min-height: 0; /* Allow chart to shrink if needed */
   width: 100%;
-  height: 550px !important;
   background: rgba(1, 5, 10, 0.6);
   border: 1px solid rgba(6, 182, 212, 0.18);
   border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 22px;
+  padding: 10px;
+  margin-bottom: 16px;
   overflow: hidden;
+  position: relative;
+}
+
+/* ACTIONS */
+.asset-actions {
+  flex-shrink: 0; /* Keep betting controls fixed size at bottom */
+  width: 100%;
 }
 
 /* INPUT */
@@ -234,10 +252,10 @@
 }
 
 /* --------------------------------------------------------------- */
-/* CHART CONTAINER FIX */
+/* CHART CONTAINER FIX                                             */
 /* --------------------------------------------------------------- */
 
 .real-chart-container {
   width: 100%;
-  height: 100%;
+  height: 100%; /* Will match the flex parent */
 }

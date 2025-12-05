@@ -21,8 +21,6 @@ const AssetCard: React.FC = () => {
       className="
         asset-card 
         w-full 
-        p-6 
-        rounded-xl 
         bg-[#0f0f0f] 
         shadow-lg 
         border 
@@ -30,7 +28,7 @@ const AssetCard: React.FC = () => {
       "
     >
       {/* HEADER */}
-      <div className="asset-header flex items-center justify-between mb-4">
+      <div className="asset-header flex items-center justify-between">
         <span className="asset-title text-xl font-semibold text-white">
           {asset}
         </span>
@@ -40,14 +38,12 @@ const AssetCard: React.FC = () => {
         </span>
       </div>
 
-      {/* REAL CHART */}
-      <div className="asset-chart mb-6">
-        <div className="w-full h-[550px] rounded-lg overflow-hidden">
-          <RealChart />
-        </div>
+      {/* REAL CHART - Wrapper needs to be flex-1 to grow */}
+      <div className="asset-chart flex-1 w-full min-h-0">
+        <RealChart />
       </div>
 
-      {/* BETTING SECTION */}
+      {/* BETTING SECTION - Fixed at bottom */}
       <div className="asset-actions w-full">
 
         {/* AMOUNT INPUT */}

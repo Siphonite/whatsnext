@@ -19,6 +19,9 @@ const RealChart: React.FC = () => {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Get current container dimensions
+    const { clientWidth, clientHeight } = containerRef.current;
+
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "#0a0a0a" },
@@ -28,8 +31,8 @@ const RealChart: React.FC = () => {
         vertLines: { color: "#1f1f1f" },
         horzLines: { color: "#1f1f1f" },
       },
-      width: containerRef.current.clientWidth,
-      height: 550, // Match the height in AssetCard css
+      width: clientWidth,
+      height: clientHeight, // Dynamically use available height
       crosshair: { mode: 0 },
       timeScale: {
         borderColor: "#222",
@@ -98,14 +101,13 @@ const RealChart: React.FC = () => {
     fetchHistorical();
 
     // Responsive Resize
-    // This ensures the chart resizes when the window or container resizes
-    const resizeObserver = new ResizeObserver(() => {
-      if (containerRef.current) {
-        chart.applyOptions({
-          width: containerRef.current.clientWidth,
-        });
-      }
+    // This ensures the chart resizes BOTH width AND height
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const { width, height } = entries[0].contentRect;
+      chart.applyOptions({ width, height });
     });
+    
     resizeObserver.observe(containerRef.current);
 
     return () => {
@@ -137,8 +139,9 @@ const RealChart: React.FC = () => {
       className="real-chart-container"
       style={{
         width: "100%",
-        height: "100%", // Fill the parent div
+        height: "100%", // Fill the flex parent
         position: "relative",
+        overflow: "hidden"
       }}
     />
   );
