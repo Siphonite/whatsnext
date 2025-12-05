@@ -259,3 +259,11 @@
   width: 100%;
   height: 100%; /* Will match the flex parent */
 }
+
+/* ensure TradingView container fully occupies the chart area */
+.asset-chart > #tv-chart,
+.asset-chart > div[id^="tv-chart"] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 480px;
+}

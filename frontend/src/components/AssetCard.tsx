@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMarketStore } from "../store/useMarketStore";
-import RealChart from "./RealChart";
+import TradingViewChart from "./TradingViewChart";
 
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
@@ -13,7 +13,7 @@ const AssetCard: React.FC = () => {
     }
 
     console.log(`Bet ${side} with $${amount}`);
-    // placeBet() will be integrated later
+    // placeBet() integration comes later
   };
 
   return (
@@ -25,10 +25,12 @@ const AssetCard: React.FC = () => {
         shadow-lg 
         border 
         border-[#1f1f1f]
+        rounded-xl
+        p-6
       "
     >
       {/* HEADER */}
-      <div className="asset-header flex items-center justify-between">
+      <div className="asset-header flex items-center justify-between mb-4">
         <span className="asset-title text-xl font-semibold text-white">
           {asset}
         </span>
@@ -38,12 +40,17 @@ const AssetCard: React.FC = () => {
         </span>
       </div>
 
-      {/* REAL CHART - Wrapper needs to be flex-1 to grow */}
-      <div className="asset-chart flex-1 w-full min-h-0">
-        <RealChart />
+      {/* TRADINGVIEW CHART */}
+      <div className="asset-chart w-full h-[550px] mb-6 rounded-lg overflow-hidden">
+        <TradingViewChart 
+          asset={asset}
+          interval="240"          // 4H candles
+          theme="dark"
+          containerId={`tv-chart-${asset.replace("/", "")}`} 
+        />
       </div>
 
-      {/* BETTING SECTION - Fixed at bottom */}
+      {/* BETTING SECTION */}
       <div className="asset-actions w-full">
 
         {/* AMOUNT INPUT */}
