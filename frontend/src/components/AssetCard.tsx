@@ -4,7 +4,6 @@ import RealChart from "./RealChart";
 
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
-
   const [amount, setAmount] = useState<string>("");
 
   const handleBet = (side: "GREEN" | "RED") => {
@@ -13,56 +12,86 @@ const AssetCard: React.FC = () => {
       return;
     }
 
-    // This is where you will later call:
-    // placeBet(market_id, side, amount)
     console.log(`Bet ${side} with $${amount}`);
+    // placeBet() will be integrated later
   };
 
   return (
-    <div className="asset-card p-4 rounded-xl bg-[#0f0f0f] shadow-lg border border-[#1f1f1f]">
-      
+    <div
+      className="
+        asset-card 
+        w-full 
+        p-6 
+        rounded-xl 
+        bg-[#0f0f0f] 
+        shadow-lg 
+        border 
+        border-[#1f1f1f]
+      "
+    >
       {/* HEADER */}
-      <div className="asset-header flex items-center justify-between mb-2">
-        <span className="asset-title text-lg font-semibold text-white">
+      <div className="asset-header flex items-center justify-between mb-4">
+        <span className="asset-title text-xl font-semibold text-white">
           {asset}
         </span>
 
-        <span className="asset-price text-green-400 text-md font-medium">
+        <span className="asset-price text-green-400 text-lg font-medium">
           {price ? `$${price.toFixed(2)}` : "$0.00"}
         </span>
       </div>
 
       {/* REAL CHART */}
-      <div className="asset-chart mb-4">
-        <RealChart />
+      <div className="asset-chart mb-6">
+        <div className="w-full h-[550px] rounded-lg overflow-hidden">
+          <RealChart />
+        </div>
       </div>
 
       {/* BETTING SECTION */}
-      <div className="asset-actions">
-        {/* Amount Input */}
-        <div className="amount-input flex items-center bg-black/40 px-3 py-2 rounded-lg border border-gray-700 mb-3">
+      <div className="asset-actions w-full">
+
+        {/* AMOUNT INPUT */}
+        <div className="amount-input flex items-center bg-black/40 px-3 py-3 rounded-lg border border-gray-700 mb-4">
           <span className="mr-2 text-gray-400">$</span>
           <input
             type="number"
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="bg-transparent w-full outline-none text-white"
+            className="bg-transparent w-full outline-none text-white text-lg"
           />
         </div>
 
-        {/* Bet Buttons */}
-        <div className="bet-buttons flex gap-3">
+        {/* BET BUTTONS */}
+        <div className="bet-buttons flex gap-4">
           <button
             onClick={() => handleBet("GREEN")}
-            className="bet-green flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold"
+            className="
+              flex-1 
+              py-3 
+              rounded-lg 
+              bg-green-600 
+              hover:bg-green-500 
+              transition 
+              text-white 
+              font-semibold
+            "
           >
             GREEN
           </button>
 
           <button
             onClick={() => handleBet("RED")}
-            className="bet-red flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold"
+            className="
+              flex-1 
+              py-3 
+              rounded-lg 
+              bg-red-600 
+              hover:bg-red-500 
+              transition 
+              text-white 
+              font-semibold
+            "
           >
             RED
           </button>

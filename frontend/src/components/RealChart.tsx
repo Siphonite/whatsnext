@@ -29,10 +29,11 @@ const RealChart: React.FC = () => {
         horzLines: { color: "#1f1f1f" },
       },
       width: containerRef.current.clientWidth,
-      height: 240, // Increased a bit
+      height: 550, // Match the height in AssetCard css
       crosshair: { mode: 0 },
       timeScale: {
         borderColor: "#222",
+        timeVisible: true,
       },
       rightPriceScale: {
         borderColor: "#222",
@@ -81,7 +82,7 @@ const RealChart: React.FC = () => {
         const data = await res.json();
 
         const converted = data.map((c: any) => ({
-          time: c[0] / 1000 as UTCTimestamp,
+          time: (c[0] / 1000) as UTCTimestamp,
           open: parseFloat(c[1]),
           high: parseFloat(c[2]),
           low: parseFloat(c[3]),
@@ -97,10 +98,13 @@ const RealChart: React.FC = () => {
     fetchHistorical();
 
     // Responsive Resize
+    // This ensures the chart resizes when the window or container resizes
     const resizeObserver = new ResizeObserver(() => {
-      chart.applyOptions({
-        width: containerRef.current!.clientWidth,
-      });
+      if (containerRef.current) {
+        chart.applyOptions({
+          width: containerRef.current.clientWidth,
+        });
+      }
     });
     resizeObserver.observe(containerRef.current);
 
@@ -133,7 +137,7 @@ const RealChart: React.FC = () => {
       className="real-chart-container"
       style={{
         width: "100%",
-        height: "240px",
+        height: "100%", // Fill the parent div
         position: "relative",
       }}
     />

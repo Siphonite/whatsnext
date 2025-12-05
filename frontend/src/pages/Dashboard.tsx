@@ -8,28 +8,24 @@ import "../styles/dashboard.css";
 import { usePriceFeed } from "../hooks/usePriceFeed";
 
 const Dashboard: React.FC = () => {
-  // activate single-asset live price feed
-  usePriceFeed();
+  usePriceFeed(); // Activate single-asset price feed
 
   return (
     <div className="dashboard-container">
-
       {/* LEFT SIDEBAR */}
       <Sidebar />
 
       {/* MAIN AREA */}
       <main className="dashboard-main">
-
         {/* TOP BAR */}
         <TopBar />
 
-        {/* Single Asset Card */}
-        <div className="dashboard-single-wrapper">
-          <AssetCard /> 
+        {/* FULL WIDTH CHART WRAPPER */}
+        {/* Removed 'justify-center' to allow full expansion naturally */}
+        <div className="dashboard-single-wrapper w-full px-6 mt-4">
+          <AssetCard />
         </div>
-
       </main>
-
     </div>
   );
 };
