@@ -1,12 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useMarketStore } from "../store/useMarketStore";
+import { useMarketTimerStore } from "../store/useMarketTimerStore";
 import TradingViewChart from "./TradingViewChart";
 
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
+  const { timeLeft } = useMarketTimerStore();
   const [amount, setAmount] = useState<string>("");
+  const [chartKey, setChartKey] = useState(0);
+
+  // Check if betting is locked (timeLeft <= 0)
+  const isLocked = useMemo(() => {
+    return timeLeft <= 0;
+  }, [timeLeft]);
+
+  // Reset amount and refresh chart when timer hits 0
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      setAmount("");
+      // Refresh chart by changing key (forces remount)
+      setChartKey((prev) => prev + 1);
+    }
+  }, [timeLeft]);
 
   const handleBet = (side: "GREEN" | "RED") => {
+    if (isLocked) {
+      alert("Betting is locked. Please wait for the next candle.");
+      return;
+    }
+
     if (!amount || Number(amount) <= 0) {
       alert("Enter a valid amount");
       return;
@@ -43,6 +65,7 @@ const AssetCard: React.FC = () => {
       {/* TRADINGVIEW CHART */}
       <div className="asset-chart w-full h-[550px] mb-6 rounded-lg overflow-hidden">
         <TradingViewChart 
+          key={chartKey}
           asset={asset}
           interval="240"          // 4H candles
           theme="dark"
@@ -61,7 +84,8 @@ const AssetCard: React.FC = () => {
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="bg-transparent w-full outline-none text-white text-lg"
+            disabled={isLocked}
+            className="bg-transparent w-full outline-none text-white text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 
@@ -69,32 +93,38 @@ const AssetCard: React.FC = () => {
         <div className="bet-buttons flex gap-4">
           <button
             onClick={() => handleBet("GREEN")}
-            className="
+            disabled={isLocked}
+            className={`
               flex-1 
               py-3 
               rounded-lg 
-              bg-green-600 
-              hover:bg-green-500 
               transition 
               text-white 
               font-semibold
-            "
+              ${isLocked 
+                ? "bg-gray-600 cursor-not-allowed opacity-50" 
+                : "bg-green-600 hover:bg-green-500"
+              }
+            `}
           >
             GREEN
           </button>
 
           <button
             onClick={() => handleBet("RED")}
-            className="
+            disabled={isLocked}
+            className={`
               flex-1 
               py-3 
               rounded-lg 
-              bg-red-600 
-              hover:bg-red-500 
               transition 
               text-white 
               font-semibold
-            "
+              ${isLocked 
+                ? "bg-gray-600 cursor-not-allowed opacity-50" 
+                : "bg-red-600 hover:bg-red-500"
+              }
+            `}
           >
             RED
           </button>

@@ -1,43 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useMarketStore } from "../store/useMarketStore";
+import { useMarketTimerStore } from "../store/useMarketTimerStore";
+import { useMarketTimer } from "../hooks/useMarketTimer";
 import "../styles/topbar.css";
 
 const TopBar: React.FC = () => {
   const { asset, price } = useMarketStore();
-
-  const [timeLeft, setTimeLeft] = useState("00:00:00");
-  const [isLocked, setIsLocked] = useState(false);
+  const { timeLeft } = useMarketTimerStore();
+  
+  // Initialize timer sync
+  useMarketTimer();
 
   // Format helper
   const format = (num: number) => num.toString().padStart(2, "0");
 
-  // Placeholder market data (would come from props or context in future)
-  // For now, assume market runs for 4 hours
-  const marketStartTime = Math.floor(Date.now() / 1000);
-  const marketEndTime = marketStartTime + (4 * 3600); // 4 hours
-  const marketLockTime = marketEndTime - (10 * 60); // 10 mins before close
+  // Convert timeLeft (milliseconds) to HH:MM:SS
+  const timeDisplay = useMemo(() => {
+    const totalSeconds = Math.floor(timeLeft / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${format(hours)}:${format(minutes)}:${format(seconds)}`;
+  }, [timeLeft]);
 
-  // ------------------------------
-  // REAL COUNTDOWN TIMER
-  // ------------------------------
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now() / 1000;
+  // Check if timer is locked (timeLeft <= 0 or < 5 minutes)
+  const isLocked = useMemo(() => {
+    return timeLeft <= 0;
+  }, [timeLeft]);
 
-      // lock status
-      setIsLocked(now >= marketLockTime);
-
-      const remaining = Math.max(0, marketEndTime - now);
-
-      const hours = Math.floor(remaining / 3600);
-      const minutes = Math.floor((remaining % 3600) / 60);
-      const seconds = Math.floor(remaining % 60);
-
-      setTimeLeft(`${format(hours)}:${format(minutes)}:${format(seconds)}`);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Check if timer should flash red (< 5 minutes)
+  const shouldFlashRed = useMemo(() => {
+    return timeLeft > 0 && timeLeft < 5 * 60 * 1000; // 5 minutes in milliseconds
+  }, [timeLeft]);
 
   return (
     <div className="topbar-container">
@@ -57,7 +51,9 @@ const TopBar: React.FC = () => {
       <div className="topbar-center">
         <div className="countdown-box">
           <span>Candle Closes In:</span>
-          <h3 className="countdown-time">{timeLeft}</h3>
+          <h3 className={`countdown-time ${shouldFlashRed ? "flash-red" : ""}`}>
+            {timeDisplay}
+          </h3>
         </div>
       </div>
 

@@ -1,0 +1,109 @@
+/* Topbar Layout */
+.topbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.topbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.highlight {
+  color: #67e8f9;
+}
+
+/* Lock Status */
+.lock-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.lock-status.open {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.lock-status.locked {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Countdown Box */
+.countdown-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.countdown-box span {
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.countdown-time {
+  font-family: "Orbitron", monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: #67e8f9;
+  letter-spacing: 2px;
+  transition: color 0.3s ease;
+}
+
+/* Flash Red Animation */
+.countdown-time.flash-red {
+  color: #ef4444;
+  animation: flashRed 1s ease-in-out infinite;
+}
+
+@keyframes flashRed {
+  0%, 100% {
+    color: #ef4444;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    color: #ff6b6b;
+    text-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+  }
+}
+
+/* Market ID Box */
+.market-id-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.market-id-box span {
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.market-id-box h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #10b981;
+  font-family: monospace;
+}
+
