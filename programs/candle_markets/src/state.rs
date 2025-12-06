@@ -50,3 +50,4 @@ pub enum BetSide {
     Green,
     Red,
 }
+

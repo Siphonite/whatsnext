@@ -35,6 +35,9 @@ const TradingViewChart: React.FC<Props> = ({
           }
 
           // TradingView widget constructor
+          // NOTE: This widget pulls data from TradingView's servers by default.
+          // For backend-driven charts, use BackendChart component instead.
+          // This component is kept for compatibility but should not be used for production.
           // @ts-ignore
           widgetRef.current = new (window as any).TradingView.widget({
             width: "100%",
@@ -46,13 +49,11 @@ const TradingViewChart: React.FC<Props> = ({
             theme: theme === "dark" ? "dark" : "light",
             style: "1", // 1=candlesticks default
             locale: "en",
-            // saves settings to local storage (optional)
             enable_publishing: false,
-            allow_symbol_change: true,
+            allow_symbol_change: false, // Disabled to prevent external data changes
             range: "YTD",
             details: true,
             studies: [
-              // example indicators:
               "MASimple@tv-basicstudies",
               "RSI@tv-basicstudies",
             ],
@@ -60,7 +61,8 @@ const TradingViewChart: React.FC<Props> = ({
             hide_side_toolbar: false,
             hideideas: true,
             toolbar_bg: theme === "dark" ? "#0b0e14" : "#ffffff",
-            // This will show the built-in countdown & status; TradingView handles history & timer itself
+            // WARNING: TradingView widget uses its own datafeed.
+            // For backend-driven charts, use BackendChart component.
             overrides: {},
             studies_overrides: {},
           });

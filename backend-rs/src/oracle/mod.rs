@@ -8,6 +8,7 @@ pub mod tradingview;  // kept as a fallback option
 pub mod binance;
 
 pub use types::CandleData;
+pub use binance::fetch_binance_historical;
 
 use anyhow::{Result, anyhow};
 

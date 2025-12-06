@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 pub mod state;
 use state::*;
 
-declare_id!("ELwxnoPjmwTRFUwTdsCqCrUjeFqsaUJKwLiNe2xjkQqv");
+declare_id!("Bo4HrqyUDZtFwBwqrLZ4GnFqnvg2wzoKRb1hXgf41Aco");
 
 #[program]
 pub mod candle_markets {
@@ -339,3 +339,4 @@ pub enum CandleError {
     #[msg("Market has not ended yet")]
     MarketNotEnded, // <--- NEW: used by settle_market
 }
+

@@ -1,0 +1,21 @@
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.next/
+
+# Rust (backend & Anchor program)
+target/
+backend-rs/target/
+programs/candle_markets/target/
+
+# Anchor
+.anchor/
+programs/*/target/
+programs/*/node_modules/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log

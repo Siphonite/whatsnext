@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "programs/candle_markets",
+]
+
+exclude = [
+    "backend-rs",
+    "frontend",
+]
+
+[profile.release]
+opt-level = "s"
+overflow-checks = true

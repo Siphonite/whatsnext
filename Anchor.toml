@@ -1,0 +1,16 @@
+[features]
+skip-lint = false
+
+[programs.localnet]
+candle_markets = "Bo4HrqyUDZtFwBwqrLZ4GnFqnvg2wzoKRb1hXgf41Aco"
+
+[programs.devnet]
+candle_markets = "Bo4HrqyUDZtFwBwqrLZ4GnFqnvg2wzoKRb1hXgf41Aco"
+
+[provider]
+cluster = "devnet"
+wallet = "/home/siphonite/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 'tests/**/*.ts'"
+

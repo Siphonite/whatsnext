@@ -78,21 +78,9 @@ const RealChart: React.FC = () => {
           }
         }
 
-        // FALLBACK → Binance historical 4H candles
-        const res = await fetch(
-          `https://api.binance.com/api/v3/klines?symbol=${tvSymbol}&interval=4h&limit=200`
-        );
-        const data = await res.json();
-
-        const converted = data.map((c: any) => ({
-          time: (c[0] / 1000) as UTCTimestamp,
-          open: parseFloat(c[1]),
-          high: parseFloat(c[2]),
-          low: parseFloat(c[3]),
-          close: parseFloat(c[4]),
-        }));
-
-        candleSeries.setData(converted);
+        // NO FALLBACK - Backend is the only source of truth
+        // If backend fails, chart will remain empty until backend is available
+        console.warn("Backend OHLC endpoint unavailable. Chart will remain empty.");
       } catch (err) {
         console.error("Historical candle load failed:", err);
       }
@@ -116,22 +104,9 @@ const RealChart: React.FC = () => {
     };
   }, [asset, tvSymbol]);
 
-  // -----------------------------
-  // 2. LIVE PRICE CANDLE UPDATE
-  // -----------------------------
-  useEffect(() => {
-    if (!candleSeriesRef.current || !price) return;
-
-    const timestamp = Math.floor(Date.now() / 1000) as UTCTimestamp;
-
-    candleSeriesRef.current.update({
-      time: timestamp,
-      open: price,
-      high: price,
-      low: price,
-      close: price,
-    });
-  }, [price]);
+  // NOTE: Tick-based candle updates removed.
+  // Candles must come exclusively from backend OHLC feed.
+  // Price ticks are only for spot price display, not chart data.
 
   return (
     <div

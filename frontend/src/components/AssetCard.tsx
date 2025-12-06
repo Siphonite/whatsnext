@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useMarketStore } from "../store/useMarketStore";
 import { useMarketTimerStore } from "../store/useMarketTimerStore";
-import TradingViewChart from "./TradingViewChart";
+import BackendChart from "./BackendChart";
 
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
@@ -62,14 +62,11 @@ const AssetCard: React.FC = () => {
         </span>
       </div>
 
-      {/* TRADINGVIEW CHART */}
+      {/* BACKEND-DRIVEN CHART */}
       <div className="asset-chart w-full h-[550px] mb-6 rounded-lg overflow-hidden">
-        <TradingViewChart 
+        <BackendChart 
           key={chartKey}
-          asset={asset}
-          interval="240"          // 4H candles
-          theme="dark"
-          containerId={`tv-chart-${asset.replace("/", "")}`} 
+          containerId={`backend-chart-${asset.replace("/", "")}`} 
         />
       </div>
 
