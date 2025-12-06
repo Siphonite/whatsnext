@@ -94,4 +94,3 @@ export const useOHLCStore = create<OHLCState>((set, get) => ({
     return state.historicalCandles;
   },
 }));
-
