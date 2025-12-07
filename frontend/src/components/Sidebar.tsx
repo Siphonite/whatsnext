@@ -1,13 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import "../styles/dashboard.css";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useBalance } from "../hooks/useBalance";
+import { useSolPrice } from "../hooks/useSolPrice";
 
 const Sidebar: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
 
   const { publicKey } = useWallet();
   const { balance, loading } = useBalance();
+  const { solPrice } = useSolPrice();
 
   const shorten = (str: string) =>
     str.slice(0, 4) + "..." + str.slice(-4);
@@ -15,6 +17,12 @@ const Sidebar: React.FC = () => {
   const avatarLetter = publicKey
     ? shorten(publicKey.toString())[0]
     : "U";
+
+  // Calculate USDT equivalent
+  const usdtValue = useMemo(() => {
+    if (!balance || !solPrice) return null;
+    return balance * solPrice;
+  }, [balance, solPrice]);
 
   return (
     <aside className={`dashboard-sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -65,20 +73,20 @@ const Sidebar: React.FC = () => {
 
         {!collapsed && (
           <div className="user-info">
-            <p className="user-label">WALLET BALANCE</p>
-
-            {/* Balance UI */}
-            <p className="user-balance">
-              {!publicKey
-                ? "Not Connected"
-                : loading
-                ? "Loading..."
-                : `${balance?.toFixed(2)} SOL`}
+            {/* Wallet address */}
+            <p className="text-sm text-gray-400 font-mono mb-1">
+              {publicKey ? shorten(publicKey.toString()) : "Not Connected"}
             </p>
 
-            {/* Wallet address */}
-            <p className="user-address">
-              {publicKey ? shorten(publicKey.toString()) : ""}
+            {/* Balance UI: SOL (USDT) */}
+            <p className="text-base text-white font-mono font-semibold">
+              {!publicKey
+                ? "Connect Wallet"
+                : loading
+                ? "Loading..."
+                : balance !== null
+                ? `${balance.toFixed(2)} SOL${usdtValue !== null ? ` (${usdtValue.toFixed(2)} USDT)` : ""}`
+                : "0.00 SOL"}
             </p>
           </div>
         )}
