@@ -121,13 +121,15 @@ export const useMarketTimerStore = create<MarketTimerState>()(
         }
         
         // Time drift correction: use elapsed time since last sync
-        const elapsed = Date.now() - state.lastSynced;
+        const now = Date.now();
+        const elapsed = now - state.lastSynced;
         const corrected = state.serverTime + elapsed;
         const timeLeft = Math.max(0, state.endTime - corrected);
         
         set({
           timeLeft,
           serverTime: corrected,
+          lastSynced: now,  // Update lastSynced to prevent accumulation
         });
       },
     }),
