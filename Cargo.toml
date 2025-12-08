@@ -10,4 +10,4 @@ exclude = [
 
 [profile.release]
 opt-level = "s"
-overflow-checks = true
+overflow-checks = false
