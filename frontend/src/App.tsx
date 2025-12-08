@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 // Pages
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
+import MyPositions from "./pages/MyPositions";
 
 // Solana Wallet Adapter
 import {
@@ -41,6 +42,7 @@ const App: React.FC = () => {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/positions" element={<MyPositions />} />
               </Routes>
 
             </Suspense>

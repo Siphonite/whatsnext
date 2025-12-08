@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { useMarketStore } from "../store/useMarketStore";
 import { useMarketTimerStore } from "../store/useMarketTimerStore";
 import { useMarketTimer } from "../hooks/useMarketTimer";
