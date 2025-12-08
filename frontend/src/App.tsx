@@ -19,6 +19,7 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 
 // CSS for wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
+import Leaderboard from "./pages/Leaderboard";
 
 const App: React.FC = () => {
   // You should eventually store this in an ENV
@@ -43,6 +44,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/positions" element={<MyPositions />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
               </Routes>
 
             </Suspense>
