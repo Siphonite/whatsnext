@@ -6,7 +6,6 @@ use bigdecimal::BigDecimal;
 use bigdecimal::FromPrimitive;
 use bigdecimal::ToPrimitive;
 
-
 //
 // Data Models
 //
@@ -54,8 +53,7 @@ pub async fn insert_market(
     lock_time: DateTime<Utc>,
     open_price: f64,
 ) -> Result<()> {
-    // Convert f64 -> BigDecimal because DB column is NUMERIC
-    let open_bd: BigDecimal = BigDecimal::from_f64(open_price)
+    let open_bd = BigDecimal::from_f64(open_price)
         .ok_or_else(|| anyhow::anyhow!("Failed to convert open_price to BigDecimal"))?;
 
     sqlx::query!(
@@ -91,12 +89,10 @@ pub async fn insert_bet(
     weight: f64,
     effective_stake: f64,
 ) -> Result<()> {
-    let amount_bd = BigDecimal::from_f64(amount)
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert amount to BigDecimal"))?;
-    let weight_bd = BigDecimal::from_f64(weight)
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert weight to BigDecimal"))?;
-    let stake_bd = BigDecimal::from_f64(effective_stake)
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert effective_stake to BigDecimal"))?;
+
+    let amount_bd = BigDecimal::from_f64(amount).unwrap();
+    let weight_bd = BigDecimal::from_f64(weight).unwrap();
+    let stake_bd = BigDecimal::from_f64(effective_stake).unwrap();
 
     sqlx::query!(
         r#"
@@ -119,7 +115,7 @@ pub async fn insert_bet(
 }
 
 //
-// Update Settlement
+// Update Market Settlement
 //
 pub async fn update_market_settlement(
     pool: &Pool<Postgres>,
@@ -127,8 +123,8 @@ pub async fn update_market_settlement(
     close_price: f64,
     settled: bool,
 ) -> Result<()> {
-    let close_bd = BigDecimal::from_f64(close_price)
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert close_price to BigDecimal"))?;
+
+    let close_bd = BigDecimal::from_f64(close_price).unwrap();
 
     sqlx::query!(
         r#"
@@ -155,8 +151,8 @@ pub async fn update_pnl(
     wallet: &str,
     pnl_delta: f64,
 ) -> Result<()> {
-    let pnl_bd = BigDecimal::from_f64(pnl_delta)
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert pnl_delta to BigDecimal"))?;
+
+    let pnl_bd = BigDecimal::from_f64(pnl_delta).unwrap();
 
     sqlx::query!(
         r#"
@@ -176,7 +172,12 @@ pub async fn update_pnl(
 
     Ok(())
 }
+
+//
+// Get Latest Market
+//
 pub async fn get_latest_market(pool: &Pool<Postgres>) -> Result<Market> {
+
     let row = sqlx::query!(
         r#"
         SELECT 
@@ -191,26 +192,28 @@ pub async fn get_latest_market(pool: &Pool<Postgres>) -> Result<Market> {
     .fetch_one(pool)
     .await?;
 
-    let mkt = Market {
+    Ok(Market {
         id: row.id,
         market_id: row.market_id,
         asset: row.asset,
         start_time: row.start_time,
         end_time: row.end_time,
         lock_time: row.lock_time,
-        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
-        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
-        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
-        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
-        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        open_price: row.open_price.and_then(|v| v.to_f64()),
+        close_price: row.close_price.and_then(|v| v.to_f64()),
+        green_pool_weighted: row.green_pool_weighted.and_then(|v| v.to_f64()),
+        red_pool_weighted: row.red_pool_weighted.and_then(|v| v.to_f64()),
+        virtual_liquidity: row.virtual_liquidity.and_then(|v| v.to_f64()),
         settled: row.settled,
         created_at: row.created_at,
-    };
-
-    Ok(mkt)
+    })
 }
 
+//
+// Get Market by ID
+//
 pub async fn get_market_from_db(pool: &Pool<Postgres>, id: i64) -> Result<Market> {
+
     let row = sqlx::query!(
         r#"
         SELECT 
@@ -226,30 +229,28 @@ pub async fn get_market_from_db(pool: &Pool<Postgres>, id: i64) -> Result<Market
     .fetch_one(pool)
     .await?;
 
-    let mkt = Market {
+    Ok(Market {
         id: row.id,
         market_id: row.market_id,
         asset: row.asset,
         start_time: row.start_time,
         end_time: row.end_time,
         lock_time: row.lock_time,
-        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
-        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
-        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
-        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
-        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        open_price: row.open_price.and_then(|v| v.to_f64()),
+        close_price: row.close_price.and_then(|v| v.to_f64()),
+        green_pool_weighted: row.green_pool_weighted.and_then(|v| v.to_f64()),
+        red_pool_weighted: row.red_pool_weighted.and_then(|v| v.to_f64()),
+        virtual_liquidity: row.virtual_liquidity.and_then(|v| v.to_f64()),
         settled: row.settled,
         created_at: row.created_at,
-    };
-
-    Ok(mkt)
+    })
 }
 
-// NEW FUNCTION: Fetch all markets that are ready to be settled
+//
+// Get Expired Unsettled Markets
+//
 pub async fn get_expired_unsettled_markets(pool: &Pool<Postgres>) -> Result<Vec<Market>> {
-    // We query for markets where:
-    // 1. 'settled' is false (we haven't finished it yet)
-    // 2. 'end_time' is in the past (time is up!)
+
     let rows = sqlx::query!(
         r#"
         SELECT 
@@ -264,31 +265,28 @@ pub async fn get_expired_unsettled_markets(pool: &Pool<Postgres>) -> Result<Vec<
     .fetch_all(pool)
     .await?;
 
-    // Map the raw SQL rows into our clean 'Market' struct
-    let markets = rows.into_iter().map(|row| Market {
+    Ok(rows.into_iter().map(|row| Market {
         id: row.id,
         market_id: row.market_id,
         asset: row.asset,
         start_time: row.start_time,
         end_time: row.end_time,
         lock_time: row.lock_time,
-        // Convert BigDecimals/Options to Rust types
-        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
-        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
-        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
-        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
-        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        open_price: row.open_price.and_then(|v| v.to_f64()),
+        close_price: row.close_price.and_then(|v| v.to_f64()),
+        green_pool_weighted: row.green_pool_weighted.and_then(|v| v.to_f64()),
+        red_pool_weighted: row.red_pool_weighted.and_then(|v| v.to_f64()),
+        virtual_liquidity: row.virtual_liquidity.and_then(|v| v.to_f64()),
         settled: row.settled,
         created_at: row.created_at,
-    }).collect();
-
-    Ok(markets)
+    }).collect())
 }
 
-// Fetch ALL currently active markets (for the 3x3 Grid)
+//
+// Active Markets (for dashboard grid)
+//
 pub async fn get_active_markets(pool: &Pool<Postgres>) -> Result<Vec<Market>> {
-    // Active = Not settled yet.
-    // This should return roughly 9 rows (one per asset).
+
     let rows = sqlx::query!(
         r#"
         SELECT 
@@ -303,26 +301,26 @@ pub async fn get_active_markets(pool: &Pool<Postgres>) -> Result<Vec<Market>> {
     .fetch_all(pool)
     .await?;
 
-    let markets = rows.into_iter().map(|row| Market {
+    Ok(rows.into_iter().map(|row| Market {
         id: row.id,
         market_id: row.market_id,
         asset: row.asset,
         start_time: row.start_time,
         end_time: row.end_time,
         lock_time: row.lock_time,
-        open_price: row.open_price.map(|v| v.to_f64().unwrap()),
-        close_price: row.close_price.map(|v| v.to_f64().unwrap()),
-        green_pool_weighted: row.green_pool_weighted.map(|v| v.to_f64().unwrap()),
-        red_pool_weighted: row.red_pool_weighted.map(|v| v.to_f64().unwrap()),
-        virtual_liquidity: row.virtual_liquidity.map(|v| v.to_f64().unwrap()),
+        open_price: row.open_price.and_then(|v| v.to_f64()),
+        close_price: row.close_price.and_then(|v| v.to_f64()),
+        green_pool_weighted: row.green_pool_weighted.and_then(|v| v.to_f64()),
+        red_pool_weighted: row.red_pool_weighted.and_then(|v| v.to_f64()),
+        virtual_liquidity: row.virtual_liquidity.and_then(|v| v.to_f64()),
         settled: row.settled,
         created_at: row.created_at,
-    }).collect();
-
-    Ok(markets)
+    }).collect())
 }
 
-// Fetch PnL for a specific wallet (for the Sidebar)
+//
+// PnL
+//
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PnlStats {
     pub wallet: String,
@@ -331,6 +329,7 @@ pub struct PnlStats {
 }
 
 pub async fn get_user_pnl(pool: &Pool<Postgres>, wallet: &str) -> Result<PnlStats> {
+
     let row = sqlx::query!(
         r#"
         SELECT wallet, total_pnl, total_bets
@@ -343,17 +342,162 @@ pub async fn get_user_pnl(pool: &Pool<Postgres>, wallet: &str) -> Result<PnlStat
     .await?;
 
     if let Some(r) = row {
-        Ok(PnlStats {
+        return Ok(PnlStats {
             wallet: r.wallet,
-            total_pnl: r.total_pnl.map(|v| v.to_f64().unwrap()).unwrap_or(0.0),
+            total_pnl: r.total_pnl.and_then(|v| v.to_f64()).unwrap_or(0.0),
             total_bets: r.total_bets.unwrap_or(0),
-        })
-    } else {
-        // If user has never bet, return 0 stats
-        Ok(PnlStats {
-            wallet: wallet.to_string(),
-            total_pnl: 0.0,
-            total_bets: 0,
-        })
+        });
     }
+
+    Ok(PnlStats {
+        wallet: wallet.to_string(),
+        total_pnl: 0.0,
+        total_bets: 0,
+    })
+}
+
+//
+// Positions
+//
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Position {
+    pub market_id: i64,
+    pub side: String,
+    pub amount: f64,
+    pub weight: f64,
+    pub effective_stake: f64,
+    pub payout: Option<f64>,
+    pub timestamp: i64,
+    pub status: String,
+}
+
+pub async fn get_user_positions(pool: &Pool<Postgres>, wallet: &str) -> Result<(Vec<Position>, Vec<Position>)> {
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT 
+            b.market_id,
+            b.side,
+            b.amount,
+            b.weight,
+            b.effective_stake,
+            b.payout,
+            EXTRACT(EPOCH FROM b.created_at)::BIGINT as timestamp,
+            COALESCE(m.settled, false) as settled
+        FROM bets b
+        LEFT JOIN markets m ON b.market_id = m.market_id
+        WHERE b.wallet = $1
+        ORDER BY b.created_at DESC
+        "#,
+        wallet
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut open_positions = Vec::new();
+    let mut settled_positions = Vec::new();
+
+    for row in rows {
+        let pos = Position {
+            market_id: row.market_id,
+            side: row.side,
+            amount: row.amount.to_f64().unwrap_or(0.0),
+            weight: row.weight.to_f64().unwrap_or(0.0),
+            effective_stake: row.effective_stake.to_f64().unwrap_or(0.0),
+            payout: row.payout.and_then(|v| v.to_f64()),
+            timestamp: row.timestamp.unwrap_or(0),
+            status: if row.settled.unwrap_or(false) { "SETTLED".into() } else { "OPEN".into() }
+        };
+
+        if row.settled.unwrap_or(false) {
+            settled_positions.push(pos);
+        } else {
+            open_positions.push(pos);
+        }
+    }
+
+    Ok((open_positions, settled_positions))
+}
+
+//
+// Enhanced PnL
+//
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EnhancedPnlStats {
+    pub total_pnl: f64,
+    pub win_rate: f64,
+    pub streak: i64,
+}
+
+pub async fn get_enhanced_pnl(pool: &Pool<Postgres>, wallet: &str) -> Result<EnhancedPnlStats> {
+
+    // Total PnL
+    let pnl_row = sqlx::query!(
+        r#"
+        SELECT 
+            COALESCE(SUM(b.payout - b.effective_stake), 0) as total_pnl
+        FROM bets b
+        INNER JOIN markets m ON b.market_id = m.market_id
+        WHERE b.wallet = $1 AND m.settled = true AND b.payout IS NOT NULL
+        "#,
+        wallet
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let total_pnl = pnl_row.total_pnl.and_then(|v| v.to_f64()).unwrap_or(0.0);
+
+    // Win Rate
+    let win_rate_row = sqlx::query!(
+        r#"
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN b.payout > b.effective_stake THEN 1 ELSE 0 END) as wins
+        FROM bets b
+        INNER JOIN markets m ON b.market_id = m.market_id
+        WHERE b.wallet = $1 AND m.settled = true AND b.payout IS NOT NULL
+        "#,
+        wallet
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let total_settled = win_rate_row.total.unwrap_or(0) as f64;
+    let wins = win_rate_row.wins.unwrap_or(0) as f64;
+    let win_rate = if total_settled > 0.0 { (wins / total_settled) * 100.0 } else { 0.0 };
+
+    // Streak
+    let streak_rows = sqlx::query!(
+        r#"
+        SELECT 
+            b.payout,
+            b.effective_stake,
+            b.created_at
+        FROM bets b
+        INNER JOIN markets m ON b.market_id = m.market_id
+        WHERE b.wallet = $1 AND m.settled = true AND b.payout IS NOT NULL
+        ORDER BY b.created_at DESC
+        LIMIT 100
+        "#,
+        wallet
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut streak = 0;
+    for row in streak_rows {
+        let payout = row.payout.and_then(|v| v.to_f64()).unwrap_or(0.0);
+        let stake = row.effective_stake.to_f64().unwrap_or(0.0);
+        if payout > stake {
+            streak += 1;
+        } else {
+            break;
+        }
+    }
+
+    Ok(EnhancedPnlStats {
+        total_pnl,
+        win_rate,
+        streak,
+    })
 }
