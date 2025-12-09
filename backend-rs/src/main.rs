@@ -8,12 +8,14 @@ use backend_rs::routes;
 use backend_rs::db;
 use backend_rs::state::AppState;
 
-// CHANGE 2: Remove IncomingStream from the import
-use axum::serve; 
+// Axum
+use axum::serve;
+
+// ADD THIS:
+use tower_http::cors::{CorsLayer, Any};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // ... (Your existing setup code remains exactly the same up to here) ...
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
     tracing::info!("Starting backend...");
@@ -39,14 +41,19 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let app = routes::create_router(state);
+    // ADD CORS LAYER HERE
+    let cors = CorsLayer::new()
+        .allow_origin(Any)       // allow all origins (frontend :5173)
+        .allow_methods(Any)
+        .allow_headers(Any);
 
-    // --- Axum 0.7 server startup ---
+    // Build router with CORS applied
+    let app = routes::create_router(state).layer(cors);
+
+    // Axum 0.7 server startup
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     tracing::info!("HTTP server running on http://127.0.0.1:8080");
 
-    // CHANGE 3: Remove `IncomingStream::new`. 
-    // Pass the `listener` directly to `serve`.
     serve(listener, app).await?;
 
     Ok(())
