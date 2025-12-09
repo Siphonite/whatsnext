@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 pub mod state;
 use state::*;
 
-declare_id!("Bo4HrqyUDZtFwBwqrLZ4GnFqnvg2wzoKRb1hXgf41Aco");
+declare_id!("HDMbkC4Dzg4YhpuJnEdy4KEAQbbuAaYymiEcwLsLYHaH");
 
 #[program]
 pub mod candle_markets {

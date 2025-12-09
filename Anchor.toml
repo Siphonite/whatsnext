@@ -2,10 +2,10 @@
 skip-lint = false
 
 [programs.localnet]
-candle_markets = "Bo4HrqyUDZtFwBwqrLZ4GnFqnvg2wzoKRb1hXgf41Aco"
+candle_markets = "HDMbkC4Dzg4YhpuJnEdy4KEAQbbuAaYymiEcwLsLYHaH"
 
 [programs.devnet]
-candle_markets = "Bo4HrqyUDZtFwBwqrLZ4GnFqnvg2wzoKRb1hXgf41Aco"
+candle_markets = "HDMbkC4Dzg4YhpuJnEdy4KEAQbbuAaYymiEcwLsLYHaH"
 
 [provider]
 cluster = "devnet"
