@@ -17,22 +17,19 @@ const AssetCard: React.FC = () => {
 
   const { program, walletPubkey, provider } = useAnchorProgram();
 
-  // Check if betting is locked (timeLeft <= 0)
-  const isLocked = useMemo(() => {
-    return timeLeft <= 0;
-  }, [timeLeft]);
+  // Betting lock check
+  const isLocked = useMemo(() => timeLeft <= 0, [timeLeft]);
 
-  // Reset amount and refresh chart when timer hits 0
+  // Reset on new candle
   useEffect(() => {
     if (timeLeft <= 0) {
       setAmount("");
-      // Refresh chart by changing key (forces remount)
       setChartKey((prev) => prev + 1);
     }
   }, [timeLeft]);
 
   // -------------------------------
-  // MAIN PLACE BET HANDLER
+  //       PLACE BET HANDLER
   // -------------------------------
   const handleBet = async (side: "GREEN" | "RED") => {
     try {
@@ -41,8 +38,9 @@ const AssetCard: React.FC = () => {
         return;
       }
 
-      if (!amount || Number(amount) <= 0) {
-        alert("Enter a valid amount");
+      const amountFloat = Number(amount);
+      if (isNaN(amountFloat) || amountFloat <= 0) {
+        alert("Invalid amount");
         return;
       }
 
@@ -53,31 +51,47 @@ const AssetCard: React.FC = () => {
 
       setLoading(true);
 
-      // 1) Fetch active market from backend
+      // 1) Fetch active markets from backend
       const res = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/market/active?asset=${encodeURIComponent(asset)}`
+        `${import.meta.env.VITE_BACKEND_URL}/market/active`
       );
 
-      const { market_id } = res.data;
+      const markets = res.data;
+      const currentMarket = Array.isArray(markets) ? markets[0] : markets;
 
-      if (!market_id) {
+      if (!currentMarket || !currentMarket.market_id) {
         alert("No active market found for this asset.");
         return;
       }
 
+      const market_id = currentMarket.market_id;
+
       // 2) Derive PDAs
       const programId = program.programId;
-
       const [marketPDA] = deriveMarketPDA(programId, market_id);
-      const [userBetPDA] = deriveUserBetPDA(programId, walletPubkey, marketPDA);
+      const [userBetPDA] = deriveUserBetPDA(
+        programId,
+        walletPubkey,
+        marketPDA
+      );
 
       // 3) Prepare instruction data
-      const amountU64 = BigInt(Number(amount) * 1_000_000); // adjust to your desired units
-      const sideEnum = side === "GREEN" ? { green: {} } : { red: {} };
+      const amountU64 = BigInt(Math.round(amountFloat * 1_000_000));
 
-      // 4) Send on-chain transaction
+      // FIX: Correct Anchor enum format based on IDL
+      const sideEnum =
+        side === "GREEN" ? { Green: {} } : { Red: {} };
+
+      console.log("♟ placeBet args:", {
+        sideEnum,
+        amountU64: amountU64.toString(),
+        marketPDA: marketPDA.toBase58(),
+        userBetPDA: userBetPDA.toBase58(),
+      });
+
+      // 4) Send Transaction
       const txSig = await program.methods
-        .placeBet(BigInt(market_id), sideEnum, amountU64)
+        .placeBet(sideEnum, amountU64)
         .accounts({
           market: marketPDA,
           userBet: userBetPDA,
@@ -96,41 +110,28 @@ const AssetCard: React.FC = () => {
   };
 
   return (
-    <div
-      className="
-        asset-card 
-        w-full 
-        bg-[#0f0f0f] 
-        shadow-lg 
-        border 
-        border-[#1f1f1f]
-        rounded-xl
-        p-6
-      "
-    >
+    <div className="asset-card w-full bg-[#0f0f0f] shadow-lg border border-[#1f1f1f] rounded-xl p-6">
       {/* HEADER */}
       <div className="asset-header flex items-center justify-between mb-4">
         <span className="asset-title text-xl font-semibold text-white">
           {asset}
         </span>
-
         <span className="asset-price text-green-400 text-lg font-medium">
           {price ? `$${price.toFixed(2)}` : "$0.00"}
         </span>
       </div>
 
-      {/* BACKEND-DRIVEN CHART */}
+      {/* CHART */}
       <div className="asset-chart w-full h-[550px] mb-6 rounded-lg overflow-hidden">
-        <BackendChart 
+        <BackendChart
           key={chartKey}
-          containerId={`backend-chart-${asset.replace("/", "")}`} 
+          containerId={`backend-chart-${asset.replace("/", "")}`}
         />
       </div>
 
       {/* BETTING SECTION */}
       <div className="asset-actions w-full">
-
-        {/* AMOUNT INPUT */}
+        {/* Amount Input */}
         <div className="amount-input flex items-center bg-black/40 px-3 py-3 rounded-lg border border-gray-700 mb-4">
           <span className="mr-2 text-gray-400">$</span>
           <input
@@ -143,23 +144,16 @@ const AssetCard: React.FC = () => {
           />
         </div>
 
-        {/* BET BUTTONS */}
+        {/* Bet Buttons */}
         <div className="bet-buttons flex gap-4">
           <button
             onClick={() => handleBet("GREEN")}
             disabled={isLocked || loading}
-            className={`
-              flex-1 
-              py-3 
-              rounded-lg 
-              transition 
-              text-white 
-              font-semibold
-              ${isLocked || loading 
-                ? "bg-gray-600 cursor-not-allowed opacity-50" 
+            className={`flex-1 py-3 rounded-lg transition text-white font-semibold ${
+              isLocked || loading
+                ? "bg-gray-600 cursor-not-allowed opacity-50"
                 : "bg-green-600 hover:bg-green-500"
-              }
-            `}
+            }`}
           >
             {loading ? "Processing..." : "GREEN"}
           </button>
@@ -167,18 +161,11 @@ const AssetCard: React.FC = () => {
           <button
             onClick={() => handleBet("RED")}
             disabled={isLocked || loading}
-            className={`
-              flex-1 
-              py-3 
-              rounded-lg 
-              transition 
-              text-white 
-              font-semibold
-              ${isLocked || loading
-                ? "bg-gray-600 cursor-not-allowed opacity-50" 
+            className={`flex-1 py-3 rounded-lg transition text-white font-semibold ${
+              isLocked || loading
+                ? "bg-gray-600 cursor-not-allowed opacity-50"
                 : "bg-red-600 hover:bg-red-500"
-              }
-            `}
+            }`}
           >
             {loading ? "Processing..." : "RED"}
           </button>

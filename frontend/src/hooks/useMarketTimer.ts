@@ -15,7 +15,9 @@ export const useMarketTimer = () => {
     const fetchMarketData = async () => {
       try {
         // Fetch active markets from backend
-        const response = await fetch("/api/market/active");
+        const response = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/market/active`
+        );
         
         if (!response.ok) {
           throw new Error(`Failed to fetch market data: ${response.statusText}`);
