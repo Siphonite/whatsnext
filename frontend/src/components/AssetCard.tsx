@@ -3,11 +3,19 @@ import { useMarketStore } from "../store/useMarketStore";
 import { useMarketTimerStore } from "../store/useMarketTimerStore";
 import BackendChart from "./BackendChart";
 
+import axios from "axios";
+import { SystemProgram } from "@solana/web3.js";
+import { useAnchorProgram } from "../hooks/useAnchorProgram";
+import { deriveMarketPDA, deriveUserBetPDA } from "../utils/pda";
+
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
   const { timeLeft } = useMarketTimerStore();
   const [amount, setAmount] = useState<string>("");
   const [chartKey, setChartKey] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const { program, walletPubkey, provider } = useAnchorProgram();
 
   // Check if betting is locked (timeLeft <= 0)
   const isLocked = useMemo(() => {
@@ -23,19 +31,68 @@ const AssetCard: React.FC = () => {
     }
   }, [timeLeft]);
 
-  const handleBet = (side: "GREEN" | "RED") => {
-    if (isLocked) {
-      alert("Betting is locked. Please wait for the next candle.");
-      return;
-    }
+  // -------------------------------
+  // MAIN PLACE BET HANDLER
+  // -------------------------------
+  const handleBet = async (side: "GREEN" | "RED") => {
+    try {
+      if (isLocked) {
+        alert("Betting is locked. Please wait for the next candle.");
+        return;
+      }
 
-    if (!amount || Number(amount) <= 0) {
-      alert("Enter a valid amount");
-      return;
-    }
+      if (!amount || Number(amount) <= 0) {
+        alert("Enter a valid amount");
+        return;
+      }
 
-    console.log(`Bet ${side} with $${amount}`);
-    // placeBet() integration comes later
+      if (!program || !walletPubkey || !provider) {
+        alert("Connect your wallet first");
+        return;
+      }
+
+      setLoading(true);
+
+      // 1) Fetch active market from backend
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/market/active?asset=${encodeURIComponent(asset)}`
+      );
+
+      const { market_id } = res.data;
+
+      if (!market_id) {
+        alert("No active market found for this asset.");
+        return;
+      }
+
+      // 2) Derive PDAs
+      const programId = program.programId;
+
+      const [marketPDA] = deriveMarketPDA(programId, market_id);
+      const [userBetPDA] = deriveUserBetPDA(programId, walletPubkey, marketPDA);
+
+      // 3) Prepare instruction data
+      const amountU64 = BigInt(Number(amount) * 1_000_000); // adjust to your desired units
+      const sideEnum = side === "GREEN" ? { green: {} } : { red: {} };
+
+      // 4) Send on-chain transaction
+      const txSig = await program.methods
+        .placeBet(BigInt(market_id), sideEnum, amountU64)
+        .accounts({
+          market: marketPDA,
+          userBet: userBetPDA,
+          user: walletPubkey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      alert(`Bet placed successfully!\nTransaction: ${txSig}`);
+    } catch (err: any) {
+      console.error("Bet error:", err);
+      alert("Bet failed: " + (err.message || err.toString()));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -81,7 +138,7 @@ const AssetCard: React.FC = () => {
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            disabled={isLocked}
+            disabled={isLocked || loading}
             className="bg-transparent w-full outline-none text-white text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
@@ -90,7 +147,7 @@ const AssetCard: React.FC = () => {
         <div className="bet-buttons flex gap-4">
           <button
             onClick={() => handleBet("GREEN")}
-            disabled={isLocked}
+            disabled={isLocked || loading}
             className={`
               flex-1 
               py-3 
@@ -98,18 +155,18 @@ const AssetCard: React.FC = () => {
               transition 
               text-white 
               font-semibold
-              ${isLocked 
+              ${isLocked || loading 
                 ? "bg-gray-600 cursor-not-allowed opacity-50" 
                 : "bg-green-600 hover:bg-green-500"
               }
             `}
           >
-            GREEN
+            {loading ? "Processing..." : "GREEN"}
           </button>
 
           <button
             onClick={() => handleBet("RED")}
-            disabled={isLocked}
+            disabled={isLocked || loading}
             className={`
               flex-1 
               py-3 
@@ -117,13 +174,13 @@ const AssetCard: React.FC = () => {
               transition 
               text-white 
               font-semibold
-              ${isLocked 
+              ${isLocked || loading
                 ? "bg-gray-600 cursor-not-allowed opacity-50" 
                 : "bg-red-600 hover:bg-red-500"
               }
             `}
           >
-            RED
+            {loading ? "Processing..." : "RED"}
           </button>
         </div>
       </div>
