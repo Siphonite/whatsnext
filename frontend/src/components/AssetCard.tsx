@@ -7,6 +7,7 @@ import axios from "axios";
 import { SystemProgram } from "@solana/web3.js";
 import { useAnchorProgram } from "../hooks/useAnchorProgram";
 import { deriveMarketPDA, deriveUserBetPDA } from "../utils/pda";
+import * as anchor from "@coral-xyz/anchor";
 
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
@@ -17,10 +18,8 @@ const AssetCard: React.FC = () => {
 
   const { program, walletPubkey, provider } = useAnchorProgram();
 
-  // Betting lock check
   const isLocked = useMemo(() => timeLeft <= 0, [timeLeft]);
 
-  // Reset on new candle
   useEffect(() => {
     if (timeLeft <= 0) {
       setAmount("");
@@ -29,7 +28,7 @@ const AssetCard: React.FC = () => {
   }, [timeLeft]);
 
   // -------------------------------
-  //       PLACE BET HANDLER
+  // PLACE BET HANDLER
   // -------------------------------
   const handleBet = async (side: "GREEN" | "RED") => {
     try {
@@ -51,7 +50,7 @@ const AssetCard: React.FC = () => {
 
       setLoading(true);
 
-      // 1) Fetch active markets from backend
+      // 1) Fetch active markets
       const res = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/market/active`
       );
@@ -66,21 +65,18 @@ const AssetCard: React.FC = () => {
 
       const market_id = currentMarket.market_id;
 
-      // 2) Derive PDAs
+      // 2) PDA Derivation - Your utils are correct
       const programId = program.programId;
       const [marketPDA] = deriveMarketPDA(programId, market_id);
-      const [userBetPDA] = deriveUserBetPDA(
-        programId,
-        walletPubkey,
-        marketPDA
-      );
+      const [userBetPDA] = deriveUserBetPDA(programId, walletPubkey, marketPDA);
 
-      // 3) Prepare instruction data
-      const amountU64 = BigInt(Math.round(amountFloat * 1_000_000));
+      // 3) Convert amount to BN (Anchor prefers BN over BigInt)
+      const amountU64 = new anchor.BN(Math.round(amountFloat * 1_000_000));
 
-      // FIX: Correct Anchor enum format based on IDL
-      const sideEnum =
-        side === "GREEN" ? { Green: {} } : { Red: {} };
+      // ---------------------------------------------------
+      // FIX: Anchor enum MUST be lowercase plain object
+      // ---------------------------------------------------
+      const sideEnum = side === "GREEN" ? { green: {} } : { red: {} };
 
       console.log("♟ placeBet args:", {
         sideEnum,
@@ -101,6 +97,7 @@ const AssetCard: React.FC = () => {
         .rpc();
 
       alert(`Bet placed successfully!\nTransaction: ${txSig}`);
+      setAmount("");
     } catch (err: any) {
       console.error("Bet error:", err);
       alert("Bet failed: " + (err.message || err.toString()));
@@ -131,7 +128,6 @@ const AssetCard: React.FC = () => {
 
       {/* BETTING SECTION */}
       <div className="asset-actions w-full">
-        {/* Amount Input */}
         <div className="amount-input flex items-center bg-black/40 px-3 py-3 rounded-lg border border-gray-700 mb-4">
           <span className="mr-2 text-gray-400">$</span>
           <input
@@ -144,7 +140,6 @@ const AssetCard: React.FC = () => {
           />
         </div>
 
-        {/* Bet Buttons */}
         <div className="bet-buttons flex gap-4">
           <button
             onClick={() => handleBet("GREEN")}
