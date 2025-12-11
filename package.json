@@ -1,0 +1,28 @@
+{
+  "name": "whatsnext",
+  "version": "1.0.0",
+  "description": "**What’s Next?** is a Solana-based candle prediction market where users bet on whether the next **4-hour** candlestick of major assets (crypto, forex, commodities) will close **Green** or **Red**. Early bets earn higher multipliers via a Dynamic Edge Mechanism that prevents last-minute sniping. :contentReference[oaicite:1]{index=1}",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Siphonite/whatsnext.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Siphonite/whatsnext/issues"
+  },
+  "homepage": "https://github.com/Siphonite/whatsnext#readme",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.98.4"
+  }
+}

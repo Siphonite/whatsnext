@@ -1,21 +1,94 @@
-# Node
+##########################################
+# NODE / TYPESCRIPT
+##########################################
+
+# Root node modules
+node_modules/
+
+# Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/.next/
+frontend/build/
 
-# Rust (backend & Anchor program)
+# Backend (TS)
+backend/node_modules/
+backend/dist/
+
+# Scripts env
+scripts/.env
+
+##########################################
+# RUST / ANCHOR
+##########################################
+
+# Global Rust target
 target/
+
+# Backend Rust
 backend-rs/target/
+
+# Anchor program targets
 programs/candle_markets/target/
-
-# Anchor
-.anchor/
 programs/*/target/
-programs/*/node_modules/
 
-# OS files
+# Anchor artifacts
+.anchor/
+*.so
+*.a
+
+# Anchor IDL auto-gen (optional — keep if you want to commit)
+# target/idl/
+# target/types/
+
+##########################################
+# BUILD / GENERATED
+##########################################
+
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+##########################################
+# ENVIRONMENT FILES
+##########################################
+
+.env
+.env.*
+*.local
+
+##########################################
+# IDE / EDITOR
+##########################################
+
+# VSCode
+.vscode/
+
+# JetBrains
+.idea/
+
+##########################################
+# OS SPECIFIC
+##########################################
+
 .DS_Store
+Thumbs.db
 
-# Logs
+##########################################
+# LOG FILES
+##########################################
+
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+##########################################
+# MISC
+##########################################
+
+# Solana keys
+*.json.key
+solana-id.json
