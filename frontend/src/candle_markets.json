@@ -1,5 +1,5 @@
 {
-  "address": "HDMbkC4Dzg4YhpuJnEdy4KEAQbbuAaYymiEcwLsLYHaH",
+  "address": "9fAJRwzjj7dBMt7fimMo6jKwwsYFD4k9eoMPD8MwBnWb",
   "metadata": {
     "name": "candle_markets",
     "version": "0.1.0",
@@ -31,6 +31,27 @@
           "name": "user",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
         }
       ],
       "args": []
@@ -105,6 +126,52 @@
       ]
     },
     {
+      "name": "initialize_treasury",
+      "discriminator": [
+        124,
+        186,
+        211,
+        195,
+        85,
+        165,
+        129,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "place_bet",
       "discriminator": [
         222,
@@ -149,6 +216,27 @@
           "name": "user",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "system_program",
@@ -215,6 +303,19 @@
       ]
     },
     {
+      "name": "TreasuryAccount",
+      "discriminator": [
+        204,
+        140,
+        18,
+        173,
+        90,
+        152,
+        134,
+        123
+      ]
+    },
+    {
       "name": "UserBetAccount",
       "discriminator": [
         34,
@@ -268,6 +369,16 @@
       "code": 6007,
       "name": "MarketNotEnded",
       "msg": "Market has not ended yet"
+    },
+    {
+      "code": 6008,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds in treasury for payout"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidBetSize",
+      "msg": "Bet exceeds the maximum allowed size"
     }
   ],
   "types": [
@@ -333,6 +444,18 @@
           {
             "name": "settled",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

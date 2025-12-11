@@ -1,54 +1,64 @@
 import { useMemo } from "react";
-import { Program, AnchorProvider } from "@coral-xyz/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
 import { Connection } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import idl from "../candle_markets.json";
 
-
-// Not used in constructor for your Anchor version
-export const PROGRAM_ID = "HDMbkC4Dzg4YhpuJnEdy4KEAQbbuAaYymiEcwLsLYHaH";
-
 export function useAnchorProgram() {
-  const { publicKey, signTransaction, signAllTransactions } = useWallet();
+  const wallet = useWallet();
 
+  // Connection
   const connection = useMemo(() => {
-    const rpc = import.meta.env.VITE_SOLANA_RPC || "https://api.devnet.solana.com";
+    const rpc =
+      import.meta.env.VITE_SOLANA_RPC || "https://api.devnet.solana.com";
     return new Connection(rpc, "confirmed");
   }, []);
 
+  // Provider
   const provider = useMemo(() => {
-    if (!publicKey || !signTransaction || !signAllTransactions) return null;
+    if (
+      !wallet.publicKey ||
+      !wallet.signTransaction ||
+      !wallet.signAllTransactions
+    )
+      return null;
 
     const anchorWallet = {
-      publicKey,
-      signTransaction,
-      signAllTransactions,
+      publicKey: wallet.publicKey,
+      signTransaction: wallet.signTransaction,
+      signAllTransactions: wallet.signAllTransactions,
     };
 
-    return new AnchorProvider(connection, anchorWallet, {
+    return new anchor.AnchorProvider(connection, anchorWallet, {
       preflightCommitment: "confirmed",
       commitment: "confirmed",
     });
-  }, [publicKey, signTransaction, signAllTransactions, connection]);
+  }, [
+    wallet.publicKey,
+    wallet.signTransaction,
+    wallet.signAllTransactions,
+    connection,
+  ]);
 
+  // Program instance
   const program = useMemo(() => {
     if (!provider) return null;
 
     try {
-      // Your Anchor version only supports: Program(idl, provider)
-      return new Program(idl as Idl, provider);
-    } catch (e) {
-      console.error("Failed to initialize Anchor Program:", e);
+      // Anchor 0.32+ automatically reads programId from the IDL
+      return new anchor.Program(idl as Idl, provider);
+    } catch (err) {
+      console.error("Failed to create Anchor Program:", err);
       return null;
     }
   }, [provider]);
 
   return {
-    connection,
-    provider,
     program,
-    walletPubkey: publicKey ?? null,
-    connected: Boolean(publicKey),
+    provider,
+    connection,
+    walletPubkey: wallet.publicKey ?? null,
+    connected: Boolean(wallet.publicKey),
   };
 }
