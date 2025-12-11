@@ -1,6 +1,10 @@
 #![allow(unexpected_cfgs)]
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::{
+    program::invoke,
+    system_instruction,
+};
 
 pub mod state;
 use state::*;
@@ -52,193 +56,218 @@ pub mod candle_markets {
     }
 
     // ---------------------------------------------------------
-    //  STEP 5 — PLACE BET (IMPLEMENTATION DONE)
+    //  STEP 5 — PLACE BET (UPDATED: deposit to treasury PDA)
     // ---------------------------------------------------------
-pub fn place_bet(
-    ctx: Context<PlaceBet>,
-    side: BetSide,
-    amount: u64,
-) -> Result<()> {
-    let market = &mut ctx.accounts.market;
-    let user_bet = &mut ctx.accounts.user_bet;
-    let user = &ctx.accounts.user;
+    pub fn place_bet(
+        ctx: Context<PlaceBet>,
+        side: BetSide,
+        amount: u64,
+    ) -> Result<()> {
+        let market = &mut ctx.accounts.market;
+        let user_bet = &mut ctx.accounts.user_bet;
+        let user = &ctx.accounts.user;
+        let treasury = &ctx.accounts.treasury;
 
-    // -----------------------------------------------------
-    // 1. Validate time (cannot bet after lock_time)
-    // -----------------------------------------------------
-    let now = Clock::get()?.unix_timestamp;
-    require!(now < market.lock_time, CandleError::MarketLocked);
+        // -----------------------------------------------------
+        // 1. Validate time (cannot bet after lock_time)
+        // -----------------------------------------------------
+        let now = Clock::get()?.unix_timestamp;
+        require!(now < market.lock_time, CandleError::MarketLocked);
 
-    // -----------------------------------------------------
-    // 2. Prevent double-betting
-    // (PDA is created on first bet; if it exists, Anchor would fail)
-    // -----------------------------------------------------
-    require!(!user_bet.claimed, CandleError::Unauthorized);
+        // -----------------------------------------------------
+        // 2. Prevent double-betting
+        // (PDA is created on first bet; if it exists, Anchor would fail)
+        // -----------------------------------------------------
+        require!(!user_bet.claimed, CandleError::Unauthorized);
 
-    // -----------------------------------------------------
-    // 3. Determine weight tier based on elapsed time
-    // -----------------------------------------------------
-    let elapsed = now - market.start_time; // seconds
-    let weight: u64 = if elapsed < 3600 {
-        100   // 1.0x
-    } else if elapsed < 7200 {
-        70    // 0.7x
-    } else if elapsed < 10800 {
-        50    // 0.5x
-    } else {
-        20    // 0.2x
-    };
+        // -----------------------------------------------------
+        // 3. Max bet guard (example: 0.05 SOL)
+        // -----------------------------------------------------
+        const MAX_BET: u64 = 50_000_000; // 0.05 SOL in lamports
+        require!(amount <= MAX_BET, CandleError::InvalidBetSize);
 
-    // -----------------------------------------------------
-    // 4. Calculate effective stake
-    // -----------------------------------------------------
-    let effective_stake: u64 = amount * weight / 100;
+        // -----------------------------------------------------
+        // 4. Transfer lamports from user -> treasury PDA
+        // -----------------------------------------------------
+        let ix = system_instruction::transfer(&user.key(), &treasury.key(), amount);
+        invoke(
+            &ix,
+            &[
+                user.to_account_info(),
+                treasury.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
 
-    // -----------------------------------------------------
-    // 5. Update pools based on side
-    // -----------------------------------------------------
-    match side {
-        BetSide::Green => {
-            market.green_pool_weighted += effective_stake;
+        // -----------------------------------------------------
+        // 5. Determine weight tier based on elapsed time
+        // -----------------------------------------------------
+        let elapsed = now - market.start_time; // seconds
+        let weight: u64 = if elapsed < 3600 {
+            100   // 1.0x
+        } else if elapsed < 7200 {
+            70    // 0.7x
+        } else if elapsed < 10800 {
+            50    // 0.5x
+        } else {
+            20    // 0.2x
+        };
+
+        // -----------------------------------------------------
+        // 6. Calculate effective stake
+        // -----------------------------------------------------
+        let effective_stake: u64 = amount
+            .checked_mul(weight)
+            .unwrap()
+            .checked_div(100)
+            .unwrap();
+
+        // -----------------------------------------------------
+        // 7. Update pools based on side
+        // -----------------------------------------------------
+        match side {
+            BetSide::Green => {
+                market.green_pool_weighted = market
+                    .green_pool_weighted
+                    .checked_add(effective_stake)
+                    .unwrap();
+            }
+            BetSide::Red => {
+                market.red_pool_weighted = market
+                    .red_pool_weighted
+                    .checked_add(effective_stake)
+                    .unwrap();
+            }
         }
-        BetSide::Red => {
-            market.red_pool_weighted += effective_stake;
-        }
+
+        // -----------------------------------------------------
+        // 8. Save user bet state
+        // -----------------------------------------------------
+        user_bet.user = user.key();
+        user_bet.market = market.key();
+        user_bet.side = side;
+        user_bet.amount = amount;
+        user_bet.weight = weight;
+        user_bet.effective_stake = effective_stake;
+        user_bet.claimed = false;
+
+        Ok(())
     }
-
-    // -----------------------------------------------------
-    // 6. Save user bet state
-    // -----------------------------------------------------
-    user_bet.user = user.key();
-    user_bet.market = market.key();
-    user_bet.side = side;
-    user_bet.amount = amount;
-    user_bet.weight = weight;
-    user_bet.effective_stake = effective_stake;
-    user_bet.claimed = false;
-
-    Ok(())
-}
-
 
     // ---------------------------------------------------------
     //  STEP 7 — SETTLE MARKET (IMPLEMENTATION DONE)
     // ---------------------------------------------------------
 
-pub fn settle_market(
-    ctx: Context<SettleMarket>,
-    close_price: u64,
-) -> Result<()> {
-    let market = &mut ctx.accounts.market;
+    pub fn settle_market(
+        ctx: Context<SettleMarket>,
+        close_price: u64,
+    ) -> Result<()> {
+        let market = &mut ctx.accounts.market;
 
-    // 1) Ensure the market end time has passed
-    let now = Clock::get()?.unix_timestamp;
-    require!(now >= market.end_time, CandleError::MarketNotEnded);
+        // 1) Ensure the market end time has passed
+        let now = Clock::get()?.unix_timestamp;
+        require!(now >= market.end_time, CandleError::MarketNotEnded);
 
-    // 2) Prevent double settlement
-    require!(!market.settled, CandleError::Unauthorized);
+        // 2) Prevent double settlement
+        require!(!market.settled, CandleError::Unauthorized);
 
-    // 3) Set close price and mark as settled
-    market.close_price = close_price;
-    market.settled = true;
+        // 3) Set close price and mark as settled
+        market.close_price = close_price;
+        market.settled = true;
 
-    Ok(())
-}
-
+        Ok(())
+    }
 
     // ---------------------------------------------------------
-    //  STEP 8 — CLAIM REWARD (IMPLEMENT LATER)
+    //  STEP 8 — CLAIM REWARD (UPDATED: payout from treasury PDA)
     // ---------------------------------------------------------
 
-pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
-    let market = &mut ctx.accounts.market;
-    let user_bet = &mut ctx.accounts.user_bet;
-    let user = &ctx.accounts.user;
+    pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
+        let market = &mut ctx.accounts.market;
+        let user_bet = &mut ctx.accounts.user_bet;
+        let user = &ctx.accounts.user;
+        let treasury = &ctx.accounts.treasury;
 
-    // -------------------------------------------------------------
-    // 1. Must be settled
-    // -------------------------------------------------------------
-    require!(market.settled, CandleError::SettlementPending);
+        // -------------------------------------------------------------
+        // 1. Must be settled
+        // -------------------------------------------------------------
+        require!(market.settled, CandleError::SettlementPending);
 
-    // -------------------------------------------------------------
-    // 2. User must not have already claimed
-    // -------------------------------------------------------------
-    require!(!user_bet.claimed, CandleError::AlreadyClaimed);
+        // -------------------------------------------------------------
+        // 2. User must not have already claimed
+        // -------------------------------------------------------------
+        require!(!user_bet.claimed, CandleError::AlreadyClaimed);
 
-    // -------------------------------------------------------------
-    // 3. Determine market result
-    // -------------------------------------------------------------
-    let winning_side = if market.close_price > market.open_price {
-        BetSide::Green
-    } else if market.close_price < market.open_price {
-        BetSide::Red
-    } else {
-        // flat candle → nobody wins (rare but possible)
-        // user gets nothing
+        // -------------------------------------------------------------
+        // 3. Determine market result
+        // -------------------------------------------------------------
+        let winning_side = if market.close_price > market.open_price {
+            BetSide::Green
+        } else if market.close_price < market.open_price {
+            BetSide::Red
+        } else {
+            // flat candle → nobody wins (rare but possible)
+            // user gets nothing
+            user_bet.claimed = true;
+            return Ok(());
+        };
+
+        // -------------------------------------------------------------
+        // 4. If user bet on losing side → reward = 0
+        // -------------------------------------------------------------
+        if user_bet.side != winning_side {
+            user_bet.claimed = true;
+            return Ok(());
+        }
+
+        // -------------------------------------------------------------
+        // 5. Compute total weighted stakes
+        // Exclude virtual liquidity
+        // -------------------------------------------------------------
+        let virtual_liq = market.virtual_liquidity;
+
+        let (winning_pool, losing_pool) = match winning_side {
+            BetSide::Green => (market.green_pool_weighted, market.red_pool_weighted),
+            BetSide::Red => (market.red_pool_weighted, market.green_pool_weighted),
+        };
+
+        let total_winning_weighted = winning_pool.checked_sub(virtual_liq).unwrap_or(0);
+        let total_losing_weighted = losing_pool.checked_sub(virtual_liq).unwrap_or(0);
+
+        // If nobody bet on either side (possible edge case)
+        if total_winning_weighted == 0 || total_losing_weighted == 0 {
+            user_bet.claimed = true;
+            return Ok(()); // nothing to pay out
+        }
+
+        // -------------------------------------------------------------
+        // 6. Compute user's payout
+        // payout = (effective_stake / total_winning_weighted) * total_losing_weighted
+        // -------------------------------------------------------------
+        let payout = (user_bet.effective_stake as u128)
+            .checked_mul(total_losing_weighted as u128)
+            .unwrap()
+            .checked_div(total_winning_weighted as u128)
+            .unwrap() as u64;
+
+        // -------------------------------------------------------------
+        // 7. Transfer payout from treasury -> user
+        // -------------------------------------------------------------
+        if payout > 0 {
+            let treasury_lamports = **treasury.to_account_info().lamports.borrow();
+            require!(treasury_lamports >= payout, CandleError::InsufficientFunds);
+
+            **treasury.to_account_info().try_borrow_mut_lamports()? -= payout;
+            **user.to_account_info().try_borrow_mut_lamports()? += payout;
+        }
+
+        // -------------------------------------------------------------
+        // 8. Mark claimed
+        // -------------------------------------------------------------
         user_bet.claimed = true;
-        return Ok(());
-    };
 
-    // -------------------------------------------------------------
-    // 4. If user bet on losing side → reward = 0
-    // -------------------------------------------------------------
-    if user_bet.side != winning_side {
-        user_bet.claimed = true;
-        return Ok(());
+        Ok(())
     }
-
-    // -------------------------------------------------------------
-    // 5. Compute total weighted stakes
-    // Exclude virtual liquidity
-    // -------------------------------------------------------------
-    let virtual_liq = market.virtual_liquidity;
-
-    let (winning_pool, losing_pool) = match winning_side {
-        BetSide::Green => (
-            market.green_pool_weighted,
-            market.red_pool_weighted,
-        ),
-        BetSide::Red => (
-            market.red_pool_weighted,
-            market.green_pool_weighted,
-        ),
-    };
-
-    let total_winning_weighted = winning_pool - virtual_liq;
-    let total_losing_weighted = losing_pool - virtual_liq;
-
-    // If nobody bet on either side (possible edge case)
-    if total_winning_weighted == 0 || total_losing_weighted == 0 {
-        user_bet.claimed = true;
-        return Ok(()); // nothing to pay out
-    }
-
-    // -------------------------------------------------------------
-    // 6. Compute user's payout
-    // payout = (effective_stake / total_winning_weighted) * total_losing_weighted
-    // -------------------------------------------------------------
-    let payout = (user_bet.effective_stake as u128)
-        .checked_mul(total_losing_weighted as u128)
-        .unwrap()
-        .checked_div(total_winning_weighted as u128)
-        .unwrap() as u64;
-
-    // -------------------------------------------------------------
-    // 7. Transfer SOL to user
-    // -------------------------------------------------------------
-    if payout > 0 {
-        **market.to_account_info().try_borrow_mut_lamports()? -= payout;
-        **user.to_account_info().try_borrow_mut_lamports()? += payout;
-    }
-
-    // -------------------------------------------------------------
-    // 8. Mark claimed
-    // -------------------------------------------------------------
-    user_bet.claimed = true;
-
-    Ok(())
- }
-
 }
 
 //
@@ -250,13 +279,12 @@ pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
 #[derive(Accounts)]
 #[instruction(asset: String, open_price: u64, start_time: i64, end_time: i64, market_id: u64)]
 pub struct CreateMarket<'info> {
-
     #[account(
         init,
         payer = authority,
         space = MarketAccount::LEN,
         seeds = [
-            b"market".as_ref(), 
+            b"market".as_ref(),
             &market_id.to_le_bytes()
         ],
         bump
@@ -268,7 +296,6 @@ pub struct CreateMarket<'info> {
 
     pub system_program: Program<'info, System>,
 }
-
 
 #[derive(Accounts)]
 pub struct PlaceBet<'info> {
@@ -291,9 +318,12 @@ pub struct PlaceBet<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
+    #[account(mut)]
+    /// CHECK: treasury is a PDA owned by program; we don't deserialize here
+    pub treasury: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
 }
-
 
 #[derive(Accounts)]
 pub struct SettleMarket<'info> {
@@ -313,8 +343,22 @@ pub struct ClaimReward<'info> {
 
     #[account(mut)]
     pub user: Signer<'info>,
+
+    #[account(mut)]
+    /// CHECK: treasury PDA (program-owned)
+    pub treasury: UncheckedAccount<'info>,
 }
 
+//
+// ───────────────────────────────────────────────────────────────
+//  ACCOUNTS HELPER / TREASURY
+// ───────────────────────────────────────────────────────────────
+//
+
+#[account]
+pub struct TreasuryAccount {
+    pub bump: u8,
+}
 
 //
 // ───────────────────────────────────────────────────────────────
@@ -340,5 +384,8 @@ pub enum CandleError {
     Unauthorized,
     #[msg("Market has not ended yet")]
     MarketNotEnded, // <--- NEW: used by settle_market
+    #[msg("Insufficient funds in treasury for payout")]
+    InsufficientFunds,
+    #[msg("Bet exceeds the maximum allowed size")]
+    InvalidBetSize,
 }
-
