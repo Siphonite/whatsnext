@@ -14,9 +14,7 @@
 ---
 
 ## Supported Assets (MVP)
-- Crypto: SOL/USDT, BTC/USDT, ETH/USDT  
-- Forex: EUR/USD, GBP/USD, USD/JPY  
-- Commodities: XAU/USD (Gold), XAG/USD (Silver), Brent Crude
+-BTCUSDT
 
 ---
 
