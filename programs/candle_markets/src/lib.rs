@@ -9,11 +9,20 @@ use anchor_lang::solana_program::{
 pub mod state;
 use state::*;
 
-declare_id!("HDMbkC4Dzg4YhpuJnEdy4KEAQbbuAaYymiEcwLsLYHaH");
+declare_id!("9fAJRwzjj7dBMt7fimMo6jKwwsYFD4k9eoMPD8MwBnWb");
 
 #[program]
 pub mod candle_markets {
     use super::*;
+
+    // ---------------------------------------------------------
+    //  STEP 1 — INITIALIZE TREASURY PDA
+    // ---------------------------------------------------------
+    pub fn initialize_treasury(ctx: Context<InitializeTreasury>) -> Result<()> {
+        let treasury = &mut ctx.accounts.treasury;
+        treasury.bump = ctx.bumps.treasury;   // updated bumps API
+        Ok(())
+    }
 
     // ---------------------------------------------------------
     //  STEP 4 — CREATE MARKET
@@ -26,15 +35,11 @@ pub mod candle_markets {
         end_time: i64,
         market_id: u64,
     ) -> Result<()> {
-        // ───── Validations ─────────────────────────────────────
         require!(end_time > start_time, CandleError::MarketClosed);
 
-        // Lock market 10 mins before closing
-        let lock_time = end_time - 600; // 600 seconds = 10 minutes
-
+        let lock_time = end_time - 600;
         let market = &mut ctx.accounts.market;
 
-        // ───── Set Market State ────────────────────────────────
         market.asset = asset;
         market.market_id = market_id;
         market.start_time = start_time;
@@ -42,21 +47,17 @@ pub mod candle_markets {
         market.lock_time = lock_time;
         market.open_price = open_price;
         market.close_price = 0;
-
-        // Virtual liquidity (constant for now)
         market.virtual_liquidity = 100;
 
-        // Bootstrap pools with virtual liquidity
         market.green_pool_weighted = market.virtual_liquidity;
         market.red_pool_weighted = market.virtual_liquidity;
 
         market.settled = false;
-
         Ok(())
     }
 
     // ---------------------------------------------------------
-    //  STEP 5 — PLACE BET (UPDATED: deposit to treasury PDA)
+    // STEP 5 — PLACE BET
     // ---------------------------------------------------------
     pub fn place_bet(
         ctx: Context<PlaceBet>,
@@ -68,27 +69,14 @@ pub mod candle_markets {
         let user = &ctx.accounts.user;
         let treasury = &ctx.accounts.treasury;
 
-        // -----------------------------------------------------
-        // 1. Validate time (cannot bet after lock_time)
-        // -----------------------------------------------------
         let now = Clock::get()?.unix_timestamp;
         require!(now < market.lock_time, CandleError::MarketLocked);
-
-        // -----------------------------------------------------
-        // 2. Prevent double-betting
-        // (PDA is created on first bet; if it exists, Anchor would fail)
-        // -----------------------------------------------------
         require!(!user_bet.claimed, CandleError::Unauthorized);
 
-        // -----------------------------------------------------
-        // 3. Max bet guard (example: 0.05 SOL)
-        // -----------------------------------------------------
-        const MAX_BET: u64 = 50_000_000; // 0.05 SOL in lamports
+        const MAX_BET: u64 = 50_000_000;
         require!(amount <= MAX_BET, CandleError::InvalidBetSize);
 
-        // -----------------------------------------------------
-        // 4. Transfer lamports from user -> treasury PDA
-        // -----------------------------------------------------
+        // Transfer SOL into Treasury PDA
         let ix = system_instruction::transfer(&user.key(), &treasury.key(), amount);
         invoke(
             &ix,
@@ -99,50 +87,32 @@ pub mod candle_markets {
             ],
         )?;
 
-        // -----------------------------------------------------
-        // 5. Determine weight tier based on elapsed time
-        // -----------------------------------------------------
-        let elapsed = now - market.start_time; // seconds
+        let elapsed = now - market.start_time;
         let weight: u64 = if elapsed < 3600 {
-            100   // 1.0x
+            100
         } else if elapsed < 7200 {
-            70    // 0.7x
+            70
         } else if elapsed < 10800 {
-            50    // 0.5x
+            50
         } else {
-            20    // 0.2x
+            20
         };
 
-        // -----------------------------------------------------
-        // 6. Calculate effective stake
-        // -----------------------------------------------------
-        let effective_stake: u64 = amount
-            .checked_mul(weight)
-            .unwrap()
-            .checked_div(100)
-            .unwrap();
+        let effective_stake = amount
+            .checked_mul(weight).unwrap()
+            .checked_div(100).unwrap();
 
-        // -----------------------------------------------------
-        // 7. Update pools based on side
-        // -----------------------------------------------------
         match side {
             BetSide::Green => {
-                market.green_pool_weighted = market
-                    .green_pool_weighted
-                    .checked_add(effective_stake)
-                    .unwrap();
+                market.green_pool_weighted =
+                    market.green_pool_weighted.checked_add(effective_stake).unwrap()
             }
             BetSide::Red => {
-                market.red_pool_weighted = market
-                    .red_pool_weighted
-                    .checked_add(effective_stake)
-                    .unwrap();
+                market.red_pool_weighted =
+                    market.red_pool_weighted.checked_add(effective_stake).unwrap()
             }
         }
 
-        // -----------------------------------------------------
-        // 8. Save user bet state
-        // -----------------------------------------------------
         user_bet.user = user.key();
         user_bet.market = market.key();
         user_bet.side = side;
@@ -155,23 +125,18 @@ pub mod candle_markets {
     }
 
     // ---------------------------------------------------------
-    //  STEP 7 — SETTLE MARKET (IMPLEMENTATION DONE)
+    // STEP 7 — SETTLE MARKET
     // ---------------------------------------------------------
-
     pub fn settle_market(
         ctx: Context<SettleMarket>,
         close_price: u64,
     ) -> Result<()> {
         let market = &mut ctx.accounts.market;
 
-        // 1) Ensure the market end time has passed
         let now = Clock::get()?.unix_timestamp;
         require!(now >= market.end_time, CandleError::MarketNotEnded);
-
-        // 2) Prevent double settlement
         require!(!market.settled, CandleError::Unauthorized);
 
-        // 3) Set close price and mark as settled
         market.close_price = close_price;
         market.settled = true;
 
@@ -179,51 +144,31 @@ pub mod candle_markets {
     }
 
     // ---------------------------------------------------------
-    //  STEP 8 — CLAIM REWARD (UPDATED: payout from treasury PDA)
+    // STEP 8 — CLAIM REWARD
     // ---------------------------------------------------------
-
     pub fn claim_reward(ctx: Context<ClaimReward>) -> Result<()> {
         let market = &mut ctx.accounts.market;
         let user_bet = &mut ctx.accounts.user_bet;
-        let user = &ctx.accounts.user;
         let treasury = &ctx.accounts.treasury;
+        let user = &ctx.accounts.user;
 
-        // -------------------------------------------------------------
-        // 1. Must be settled
-        // -------------------------------------------------------------
         require!(market.settled, CandleError::SettlementPending);
-
-        // -------------------------------------------------------------
-        // 2. User must not have already claimed
-        // -------------------------------------------------------------
         require!(!user_bet.claimed, CandleError::AlreadyClaimed);
 
-        // -------------------------------------------------------------
-        // 3. Determine market result
-        // -------------------------------------------------------------
         let winning_side = if market.close_price > market.open_price {
             BetSide::Green
         } else if market.close_price < market.open_price {
             BetSide::Red
         } else {
-            // flat candle → nobody wins (rare but possible)
-            // user gets nothing
             user_bet.claimed = true;
             return Ok(());
         };
 
-        // -------------------------------------------------------------
-        // 4. If user bet on losing side → reward = 0
-        // -------------------------------------------------------------
         if user_bet.side != winning_side {
             user_bet.claimed = true;
             return Ok(());
         }
 
-        // -------------------------------------------------------------
-        // 5. Compute total weighted stakes
-        // Exclude virtual liquidity
-        // -------------------------------------------------------------
         let virtual_liq = market.virtual_liquidity;
 
         let (winning_pool, losing_pool) = match winning_side {
@@ -231,28 +176,18 @@ pub mod candle_markets {
             BetSide::Red => (market.red_pool_weighted, market.green_pool_weighted),
         };
 
-        let total_winning_weighted = winning_pool.checked_sub(virtual_liq).unwrap_or(0);
-        let total_losing_weighted = losing_pool.checked_sub(virtual_liq).unwrap_or(0);
+        let total_winning_weighted = winning_pool.saturating_sub(virtual_liq);
+        let total_losing_weighted = losing_pool.saturating_sub(virtual_liq);
 
-        // If nobody bet on either side (possible edge case)
         if total_winning_weighted == 0 || total_losing_weighted == 0 {
             user_bet.claimed = true;
-            return Ok(()); // nothing to pay out
+            return Ok(());
         }
 
-        // -------------------------------------------------------------
-        // 6. Compute user's payout
-        // payout = (effective_stake / total_winning_weighted) * total_losing_weighted
-        // -------------------------------------------------------------
         let payout = (user_bet.effective_stake as u128)
-            .checked_mul(total_losing_weighted as u128)
-            .unwrap()
-            .checked_div(total_winning_weighted as u128)
-            .unwrap() as u64;
+            .checked_mul(total_losing_weighted as u128).unwrap()
+            .checked_div(total_winning_weighted as u128).unwrap() as u64;
 
-        // -------------------------------------------------------------
-        // 7. Transfer payout from treasury -> user
-        // -------------------------------------------------------------
         if payout > 0 {
             let treasury_lamports = **treasury.to_account_info().lamports.borrow();
             require!(treasury_lamports >= payout, CandleError::InsufficientFunds);
@@ -261,20 +196,30 @@ pub mod candle_markets {
             **user.to_account_info().try_borrow_mut_lamports()? += payout;
         }
 
-        // -------------------------------------------------------------
-        // 8. Mark claimed
-        // -------------------------------------------------------------
         user_bet.claimed = true;
-
         Ok(())
     }
 }
 
-//
-// ───────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 //  ACCOUNT CONTEXTS
-// ───────────────────────────────────────────────────────────────
-//
+// -------------------------------------------------------------
+#[derive(Accounts)]
+pub struct InitializeTreasury<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = TreasuryAccount::LEN,
+        seeds = [b"treasury".as_ref()],
+        bump
+    )]
+    pub treasury: Account<'info, TreasuryAccount>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
 
 #[derive(Accounts)]
 #[instruction(asset: String, open_price: u64, start_time: i64, end_time: i64, market_id: u64)]
@@ -283,10 +228,7 @@ pub struct CreateMarket<'info> {
         init,
         payer = authority,
         space = MarketAccount::LEN,
-        seeds = [
-            b"market".as_ref(),
-            &market_id.to_le_bytes()
-        ],
+        seeds = [b"market".as_ref(), &market_id.to_le_bytes()],
         bump
     )]
     pub market: Account<'info, MarketAccount>,
@@ -318,9 +260,12 @@ pub struct PlaceBet<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
-    #[account(mut)]
-    /// CHECK: treasury is a PDA owned by program; we don't deserialize here
-    pub treasury: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"treasury".as_ref()],
+        bump = treasury.bump
+    )]
+    pub treasury: Account<'info, TreasuryAccount>,
 
     pub system_program: Program<'info, System>,
 }
@@ -344,28 +289,17 @@ pub struct ClaimReward<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
-    #[account(mut)]
-    /// CHECK: treasury PDA (program-owned)
-    pub treasury: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"treasury".as_ref()],
+        bump = treasury.bump
+    )]
+    pub treasury: Account<'info, TreasuryAccount>,
 }
 
-//
-// ───────────────────────────────────────────────────────────────
-//  ACCOUNTS HELPER / TREASURY
-// ───────────────────────────────────────────────────────────────
-//
-
-#[account]
-pub struct TreasuryAccount {
-    pub bump: u8,
-}
-
-//
-// ───────────────────────────────────────────────────────────────
-//  ERRORS
-// ───────────────────────────────────────────────────────────────
-//
-
+// -------------------------------------------------------------
+// ERRORS
+// -------------------------------------------------------------
 #[error_code]
 pub enum CandleError {
     #[msg("Betting is locked for this market")]
@@ -383,7 +317,7 @@ pub enum CandleError {
     #[msg("Unauthorized action")]
     Unauthorized,
     #[msg("Market has not ended yet")]
-    MarketNotEnded, // <--- NEW: used by settle_market
+    MarketNotEnded,
     #[msg("Insufficient funds in treasury for payout")]
     InsufficientFunds,
     #[msg("Bet exceeds the maximum allowed size")]
