@@ -3,7 +3,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::state::AppState;
-use crate::oracle::binance::fetch_binance_price;
+use crate::oracle::binance::fetch_binance_candle;
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/BTCUSDT", get(get_btc_price))
@@ -11,10 +11,12 @@ pub fn routes() -> Router<Arc<AppState>> {
 
 /// Unified price endpoint for frontend TopBar
 async fn get_btc_price() -> Json<serde_json::Value> {
-    match fetch_binance_price().await {
-        Ok(price) => Json(json!({
+    // Use the same 4-hour interval your backend uses everywhere
+    match fetch_binance_candle(4).await {
+        Ok(candle) => Json(json!({
             "asset": "BTCUSDT",
-            "price": price
+            "price": candle.close,
+            "timestamp": candle.timestamp
         })),
         Err(e) => Json(json!({
             "error": e.to_string()

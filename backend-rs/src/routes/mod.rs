@@ -2,24 +2,31 @@ use axum::{Router, routing::get};
 use std::sync::Arc;
 use crate::state::AppState;
 
+// Declare ALL route modules here
 pub mod health;
 pub mod oracle;
 pub mod market;
 pub mod positions;
 pub mod pnl;
+pub mod claim;
+pub mod treasury;
+pub mod prices;
 
-// Router entry-point
+// Build router (but we no longer use this — main.rs merges manually)
 pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(homepage))
         .nest("/health", health::routes())
         .nest("/oracle", oracle::routes())
-        .nest("/market", market::routes())     // force-create lives here
+        .nest("/market", market::routes())
         .nest("/positions", positions::routes())
         .nest("/pnl", pnl::routes())
+        .nest("/claim", claim::routes())
+        .nest("/treasury", treasury::treasury_routes())
+        .nest("/prices", prices::routes())
         .with_state(state)
 }
 
 async fn homepage() -> &'static str {
-    "Welcome to What's Next? Backend (Multi-Asset).\n\nAvailable endpoints:\n  GET /health\n  GET /market/active\n  GET /market/:id\n  GET /market/pnl/:wallet\n  POST /market/force-create\n  GET /oracle/:symbol\n  GET /positions/:wallet\n  GET /pnl/:wallet\n"
+    "Welcome to What's Next? Backend"
 }

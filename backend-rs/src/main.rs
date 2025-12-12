@@ -4,12 +4,14 @@ use sqlx::{Pool, Postgres};
 use backend_rs::config::AppConfig;
 use backend_rs::scheduler;
 use backend_rs::solana_client::SolanaClient;
-use backend_rs::routes;
 use backend_rs::db;
 use backend_rs::state::AppState;
 
+// Route modules
+use backend_rs::routes::{market, pnl, oracle, health, claim, treasury, prices};
+
 // Axum + CORS
-use axum::serve;
+use axum::{Router, serve};
 use tower_http::cors::{CorsLayer, Any};
 
 #[tokio::main]
@@ -33,9 +35,7 @@ async fn main() -> anyhow::Result<()> {
     // -------------------------------
     // TREASURY INITIALIZATION
     // -------------------------------
-    tracing::info!("Checking treasury PDA...");
-    sol.initialize_treasury_if_needed()?;        
-    tracing::info!("Treasury ready.");
+    tracing::info!("Treasury PDA initialization must be done via POST /treasury/init.");
 
     // -------------------------------
     // APPLICATION STATE
@@ -67,11 +67,19 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    
-    let app = routes::routes().with_state(state).layer(cors);
+    let app = Router::new()
+        .nest("/market", market::routes())         
+        .nest("/pnl", pnl::routes())               
+        .nest("/oracle", oracle::routes())         
+        .nest("/health", health::routes())         
+        .nest("/claim", claim::routes())           
+        .nest("/treasury", treasury::treasury_routes())  
+        .nest("/prices", prices::routes())         
+        .with_state(state)
+        .layer(cors);
 
     // -------------------------------
-    // START HTTP SERVER (AXUM 0.7)
+    // START HTTP SERVER
     // -------------------------------
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     tracing::info!("HTTP server running at http://127.0.0.1:8080");

@@ -14,7 +14,7 @@ use crate::repository::{
 };
 
 /// ---------------------------------------------------------------------------
-/// CREATE MARKET JOB (BTC/USDT Only)
+/// CREATE MARKET JOB
 /// ---------------------------------------------------------------------------
 async fn create_market_job(
     sol: Arc<SolanaClient>,
@@ -23,7 +23,7 @@ async fn create_market_job(
 {
     let asset = "BTC/USDT";
 
-    // 1. Fetch oracle price
+    // 1. Fetch oracle candle (4h interval)
     let candle_res = get_latest_candle(4).await;
     if let Err(e) = candle_res {
         tracing::error!("Oracle error, skipping market creation: {:?}", e);
@@ -38,9 +38,15 @@ async fn create_market_job(
     let end_time = start_time + 4 * 3600;
     let lock_time = end_time - 10 * 60;
 
-    // 3. Insert market into DB first (auto-increment ID)
-    let market_id = insert_market(
+    // ------------------------------------------------------------
+    // 3. Compute the REAL market_id for Solana (UNIQUE candle ID)
+    // ------------------------------------------------------------
+    let market_id = start_time; // USE timestamp as unique market identifier
+
+    // 4. Insert into DB → returns DB primary key ID (unused for blockchain)
+    let db_id = insert_market(
         &pool,
+        market_id,                                   // FIXED
         asset,
         Utc.timestamp_opt(start_time, 0).unwrap(),
         Utc.timestamp_opt(end_time, 0).unwrap(),
@@ -50,12 +56,13 @@ async fn create_market_job(
     .await?;
 
     tracing::info!(
-        "[MARKET CREATE] Market {} created in DB | Open: {}",
+        "[MARKET CREATE] DB Market Created: db_id={} | market_id={} | open={}",
+        db_id,
         market_id,
         open_price
     );
 
-    // 4. Call Solana create_market using DB ID
+    // 5. Call Solana create_market
     let sol_clone = sol.clone();
     let on_chain_price = (open_price * 100.0) as u64;
 
@@ -64,7 +71,7 @@ async fn create_market_job(
             on_chain_price,
             start_time,
             end_time,
-            market_id as u64,
+            market_id as u64,          // FIXED - use REAL market_id
         )
     })
     .await;
@@ -72,14 +79,14 @@ async fn create_market_job(
     match sig_res {
         Ok(Ok(sig)) => {
             tracing::info!(
-                "[MARKET CREATE] Market {} confirmed on-chain. Tx={}",
+                "[MARKET CREATE] On-chain success: market_id={} tx={}",
                 market_id,
                 sig
             );
         }
         Ok(Err(e)) => {
             tracing::error!(
-                "[MARKET CREATE] Chain tx failed for market {}: {:?}",
+                "[MARKET CREATE] On-chain failure: market_id={} err={:?}",
                 market_id,
                 e
             );
@@ -108,14 +115,14 @@ async fn settle_market_job(
     tracing::info!("[SETTLEMENT] Found {} markets to settle.", markets.len());
 
     for market in markets {
-        let market_id = market.id;
+        let market_id = market.market_id; // FIXED — not market.id
 
         tracing::info!(
-            "[SETTLEMENT] Settling Market {} (BTC/USDT)",
+            "[SETTLEMENT] Processing market_id={}",
             market_id
         );
 
-        // 1. Fetch closing price
+        // 1. Fetch new close candle
         let candle_res = get_latest_candle(4).await;
         if let Err(e) = candle_res {
             tracing::error!(
@@ -138,7 +145,7 @@ async fn settle_market_job(
         match sig_res {
             Ok(Ok(sig)) => {
                 tracing::info!(
-                    "[SETTLEMENT] Market {} settled on-chain. Tx={}",
+                    "[SETTLEMENT] On-chain settlement complete: market_id={} tx={}",
                     market_id, sig
                 );
 
@@ -152,13 +159,13 @@ async fn settle_market_job(
                 .await?;
 
                 tracing::info!(
-                    "[SETTLEMENT] Market {} updated in DB.",
+                    "[SETTLEMENT] Database updated for market_id={}",
                     market_id
                 );
             }
             Ok(Err(e)) => {
                 tracing::error!(
-                    "[SETTLEMENT] Chain settlement failed for market {}: {:?}",
+                    "[SETTLEMENT] On-chain settlement failed: market_id={} err={:?}",
                     market_id, e
                 );
             }
@@ -179,7 +186,7 @@ pub async fn start_scheduler(
 {
     let sched = JobScheduler::new().await?;
 
-    // Create a BTC market every 4 hours
+    // Every 4 hours → create new market
     let sol_clone = sol.clone();
     let pool_clone = pool.clone();
     let create_job = Job::new_async("0 0 */4 * * *", move |_uuid, _l| {
@@ -187,13 +194,13 @@ pub async fn start_scheduler(
         let pool = pool_clone.clone();
         Box::pin(async move {
             if let Err(e) = create_market_job(sol, pool).await {
-                tracing::error!("[SCHEDULER] Create market job failed: {:?}", e);
+                tracing::error!("[SCHEDULER] Create job error: {:?}", e);
             }
         })
     })?;
     sched.add(create_job).await?;
 
-    // Settle markets every 10 minutes
+    // Every 10 minutes → settle expired markets
     let sol_clone = sol.clone();
     let pool_clone = pool.clone();
     let settle_job = Job::new_async("0 */10 * * * *", move |_uuid, _l| {
@@ -201,7 +208,7 @@ pub async fn start_scheduler(
         let pool = pool_clone.clone();
         Box::pin(async move {
             if let Err(e) = settle_market_job(sol, pool).await {
-                tracing::error!("[SCHEDULER] Settle job failed: {:?}", e);
+                tracing::error!("[SCHEDULER] Settle job error: {:?}", e);
             }
         })
     })?;

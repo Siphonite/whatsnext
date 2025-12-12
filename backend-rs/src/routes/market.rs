@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use serde_json::json;
-use std::sync::Arc;
+    use std::sync::Arc;
 use chrono::{Utc, TimeZone};
 
 use crate::state::AppState;
@@ -70,12 +70,7 @@ async fn get_pnl_handler(
 
 
 /// ---------------------------------------------------------------------------
-/// POST /market/force-create  (DEV ONLY)
-/// - Inserts a market into DB
-/// - Gets DB ID
-/// - Calls Solana create_market with that ID
-///
-/// This endpoint replicates scheduler behavior.
+/// POST /market/force-create (DEV ONLY)
 /// ---------------------------------------------------------------------------
 async fn force_create_market_handler(
     State(state): State<Arc<AppState>>,
@@ -87,7 +82,7 @@ async fn force_create_market_handler(
     // 1. Oracle fetch
     let candle_res = get_latest_candle(4).await;
     if let Err(e) = candle_res {
-        tracing::error!("Oracle error: {:?}", e);
+        tracing::error!("[FORCE CREATE] Oracle error: {:?}", e);
         return Json(json!({ "ok": false, "error": e.to_string() }));
     }
     let candle = candle_res.unwrap();
@@ -95,28 +90,39 @@ async fn force_create_market_handler(
 
     // 2. Compute times
     let start_time = candle.timestamp as i64;
-    let end_time = start_time + 4*3600;
+    let end_time = start_time + 4 * 3600;
     let lock_time = end_time - 600;
 
-    // 3. Insert into DB first → get market ID
-    let db_market_id = match insert_market(
+    // ------------------------------------------------------------
+    // 3. Compute REAL market_id used on-chain (match scheduler)
+    // ------------------------------------------------------------
+    let market_id = start_time;   // UNIQUE candle-based ID
+
+    // 4. Insert into DB (returns DB row id)
+    let db_row_id = match insert_market(
         &state.pool,
+        market_id,                                    // FIXED
         asset,
         Utc.timestamp_opt(start_time, 0).unwrap(),
         Utc.timestamp_opt(end_time, 0).unwrap(),
         Utc.timestamp_opt(lock_time, 0).unwrap(),
         open_price,
-    ).await {
+    )
+    .await {
         Ok(id) => id,
         Err(e) => {
-            tracing::error!("DB insert error: {:?}", e);
+            tracing::error!("[FORCE CREATE] DB insert error: {:?}", e);
             return Json(json!({ "ok": false, "error": e.to_string() }));
         }
     };
 
-    tracing::info!("[FORCE CREATE] DB Market ID = {}", db_market_id);
+    tracing::info!(
+        "[FORCE CREATE] DB Row ID = {}, market_id = {}",
+        db_row_id,
+        market_id
+    );
 
-    // 4. Call Solana create_market
+    // 5. Call Solana create_market
     let sol = state.sol.clone();
     let on_chain_price = (open_price * 100.0) as u64;
 
@@ -125,26 +131,32 @@ async fn force_create_market_handler(
             on_chain_price,
             start_time,
             end_time,
-            db_market_id as u64,
+            market_id as u64,    // Correct value for program
         )
     })
     .await;
 
     match sol_call {
         Ok(Ok(tx)) => {
-            tracing::info!("[FORCE CREATE] On-chain creation success: {}", tx);
+            tracing::info!(
+                "[FORCE CREATE] On-chain create success: market_id={} tx={}",
+                market_id,
+                tx
+            );
+
             Json(json!({
                 "ok": true,
                 "tx": tx,
-                "market_id": db_market_id
+                "market_id": market_id,
+                "db_row_id": db_row_id
             }))
         }
         Ok(Err(e)) => {
-            tracing::error!("On-chain failure: {:?}", e);
-            Json(json!({ "ok": false, "error": e.to_string() }))
+            tracing::error!("[FORCE CREATE] On-chain error: {:?}", e);
+            Json(json!({ "ok": false, "error": e.to_string() }))   // FIXED
         }
         Err(e) => {
-            tracing::error!("spawn_blocking error: {:?}", e);
+            tracing::error!("[FORCE CREATE] spawn_blocking error: {:?}", e);
             Json(json!({ "ok": false, "error": e.to_string() }))
         }
     }
