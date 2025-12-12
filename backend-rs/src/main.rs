@@ -8,10 +8,8 @@ use backend_rs::routes;
 use backend_rs::db;
 use backend_rs::state::AppState;
 
-// Axum
+// Axum + CORS
 use axum::serve;
-
-// ADD THIS:
 use tower_http::cors::{CorsLayer, Any};
 
 #[tokio::main]
@@ -20,39 +18,63 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("Starting backend...");
 
+    // -------------------------------
+    // DATABASE
+    // -------------------------------
     let pool: Pool<Postgres> = db::create_db_pool().await;
     tracing::info!("Connected to PostgreSQL");
 
+    // -------------------------------
+    // CONFIG + SOLANA CLIENT
+    // -------------------------------
     let cfg = AppConfig::load();
     let sol = Arc::new(SolanaClient::new(&cfg)?);
 
+    // -------------------------------
+    // TREASURY INITIALIZATION
+    // -------------------------------
+    tracing::info!("Checking treasury PDA...");
+    sol.initialize_treasury_if_needed()?;        
+    tracing::info!("Treasury ready.");
+
+    // -------------------------------
+    // APPLICATION STATE
+    // -------------------------------
     let state = Arc::new(AppState {
         sol: sol.clone(),
         pool: pool.clone(),
     });
 
+    // -------------------------------
+    // START SCHEDULER
+    // -------------------------------
     tokio::spawn({
         let sol = sol.clone();
         let pool = pool.clone();
         async move {
+            tracing::info!("Starting scheduler...");
             if let Err(e) = scheduler::start_scheduler(sol, pool).await {
                 tracing::error!("Scheduler failed: {:?}", e);
             }
         }
     });
 
-    // ADD CORS LAYER HERE
+    // -------------------------------
+    // BUILD ROUTER + CORS
+    // -------------------------------
     let cors = CorsLayer::new()
-        .allow_origin(Any)       // allow all origins (frontend :5173)
+        .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build router with CORS applied
-    let app = routes::create_router(state).layer(cors);
+    
+    let app = routes::routes().with_state(state).layer(cors);
 
-    // Axum 0.7 server startup
+    // -------------------------------
+    // START HTTP SERVER (AXUM 0.7)
+    // -------------------------------
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    tracing::info!("HTTP server running on http://127.0.0.1:8080");
+    tracing::info!("HTTP server running at http://127.0.0.1:8080");
 
     serve(listener, app).await?;
 
