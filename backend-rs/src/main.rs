@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use sqlx::{Pool, Postgres};
 
 use backend_rs::config::AppConfig;
 use backend_rs::scheduler;
@@ -23,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     // -------------------------------
     // DATABASE
     // -------------------------------
-    let pool: Pool<Postgres> = db::create_db_pool().await;
+    let pool = db::create_db_pool().await;
     tracing::info!("Connected to PostgreSQL");
 
     // -------------------------------
@@ -32,9 +31,6 @@ async fn main() -> anyhow::Result<()> {
     let cfg = AppConfig::load();
     let sol = Arc::new(SolanaClient::new(&cfg)?);
 
-    // -------------------------------
-    // TREASURY INITIALIZATION
-    // -------------------------------
     tracing::info!("Treasury PDA initialization must be done via POST /treasury/init.");
 
     // -------------------------------
@@ -68,13 +64,13 @@ async fn main() -> anyhow::Result<()> {
         .allow_headers(Any);
 
     let app = Router::new()
-        .nest("/market", market::routes())         
-        .nest("/pnl", pnl::routes())               
-        .nest("/oracle", oracle::routes())         
-        .nest("/health", health::routes())         
-        .nest("/claim", claim::routes())           
-        .nest("/treasury", treasury::treasury_routes())  
-        .nest("/prices", prices::routes())         
+        .nest("/market", market::routes())
+        .nest("/pnl", pnl::routes())
+        .nest("/oracle", oracle::routes())
+        .nest("/health", health::routes())
+        .nest("/claim", claim::routes())
+        .nest("/treasury", treasury::treasury_routes())
+        .nest("/prices", prices::routes())
         .with_state(state)
         .layer(cors);
 

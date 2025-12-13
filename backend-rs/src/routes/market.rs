@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use serde_json::json;
-    use std::sync::Arc;
+use std::sync::Arc;
 use chrono::{Utc, TimeZone};
 
 use crate::state::AppState;
@@ -17,7 +17,6 @@ use crate::repository::{
 };
 use crate::oracle::get_latest_candle;
 
-
 /// ---------------------------------------------------------------------------
 /// MARKET ROUTES
 /// ---------------------------------------------------------------------------
@@ -26,9 +25,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/active", get(get_active_markets_handler))
         .route("/:id", get(get_market_handler))
         .route("/pnl/:wallet", get(get_pnl_handler))
-        .route("/force-create", post(force_create_market_handler))   // DEV ONLY
+        .route("/force-create", post(force_create_market_handler)) // DEV ONLY
 }
-
 
 /// ---------------------------------------------------------------------------
 /// GET /market/active
@@ -68,24 +66,24 @@ async fn get_pnl_handler(
     }
 }
 
-
 /// ---------------------------------------------------------------------------
-/// POST /market/force-create (DEV ONLY)
+/// POST /market/force-create (DEV ONLY, SAFE & IDEMPOTENT)
 /// ---------------------------------------------------------------------------
 async fn force_create_market_handler(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    
     let asset = "BTC/USDT";
     tracing::info!("[FORCE CREATE] Starting forced market creation...");
 
-    // 1. Oracle fetch
-    let candle_res = get_latest_candle(4).await;
-    if let Err(e) = candle_res {
-        tracing::error!("[FORCE CREATE] Oracle error: {:?}", e);
-        return Json(json!({ "ok": false, "error": e.to_string() }));
-    }
-    let candle = candle_res.unwrap();
+    // 1. Fetch latest 4h candle
+    let candle = match get_latest_candle(4).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("[FORCE CREATE] Oracle error: {:?}", e);
+            return Json(json!({ "ok": false, "error": e.to_string() }));
+        }
+    };
+
     let open_price = candle.open;
 
     // 2. Compute times
@@ -93,15 +91,28 @@ async fn force_create_market_handler(
     let end_time = start_time + 4 * 3600;
     let lock_time = end_time - 600;
 
-    // ------------------------------------------------------------
-    // 3. Compute REAL market_id used on-chain (match scheduler)
-    // ------------------------------------------------------------
-    let market_id = start_time;   // UNIQUE candle-based ID
+    // ✅ Deterministic market_id (shared with scheduler & Solana)
+    let market_id = start_time;
 
-    // 4. Insert into DB (returns DB row id)
+    // 3. CHECK if market already exists
+    if let Ok(existing) = get_market_from_db(&state.pool, market_id).await {
+        tracing::warn!(
+            "[FORCE CREATE] Market already exists: market_id={}",
+            market_id
+        );
+
+        return Json(json!({
+            "ok": true,
+            "already_exists": true,
+            "market_id": market_id,
+            "market": existing
+        }));
+    }
+
+    // 4. Insert into DB
     let db_row_id = match insert_market(
         &state.pool,
-        market_id,                                    // FIXED
+        market_id,
         asset,
         Utc.timestamp_opt(start_time, 0).unwrap(),
         Utc.timestamp_opt(end_time, 0).unwrap(),
@@ -122,21 +133,19 @@ async fn force_create_market_handler(
         market_id
     );
 
-    // 5. Call Solana create_market
+    // 5. Create on-chain market
     let sol = state.sol.clone();
     let on_chain_price = (open_price * 100.0) as u64;
 
-    let sol_call = tokio::task::spawn_blocking(move || {
+    match tokio::task::spawn_blocking(move || {
         sol.create_market_and_send(
             on_chain_price,
             start_time,
             end_time,
-            market_id as u64,    // Correct value for program
+            market_id as u64,
         )
     })
-    .await;
-
-    match sol_call {
+    .await {
         Ok(Ok(tx)) => {
             tracing::info!(
                 "[FORCE CREATE] On-chain create success: market_id={} tx={}",
@@ -146,14 +155,15 @@ async fn force_create_market_handler(
 
             Json(json!({
                 "ok": true,
-                "tx": tx,
+                "created": true,
                 "market_id": market_id,
-                "db_row_id": db_row_id
+                "db_row_id": db_row_id,
+                "tx": tx
             }))
         }
         Ok(Err(e)) => {
             tracing::error!("[FORCE CREATE] On-chain error: {:?}", e);
-            Json(json!({ "ok": false, "error": e.to_string() }))   // FIXED
+            Json(json!({ "ok": false, "error": e.to_string() }))
         }
         Err(e) => {
             tracing::error!("[FORCE CREATE] spawn_blocking error: {:?}", e);

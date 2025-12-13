@@ -19,18 +19,18 @@ use crate::repository::{
 async fn create_market_job(
     sol: Arc<SolanaClient>,
     pool: Pool<Postgres>,
-) -> Result<()> 
-{
+) -> Result<()> {
     let asset = "BTC/USDT";
 
     // 1. Fetch oracle candle (4h interval)
-    let candle_res = get_latest_candle(4).await;
-    if let Err(e) = candle_res {
-        tracing::error!("Oracle error, skipping market creation: {:?}", e);
-        return Ok(());
-    }
+    let candle = match get_latest_candle(4).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Oracle error, skipping market creation: {:?}", e);
+            return Ok(());
+        }
+    };
 
-    let candle = candle_res.unwrap();
     let open_price = candle.open;
 
     // 2. Compute times
@@ -38,22 +38,29 @@ async fn create_market_job(
     let end_time = start_time + 4 * 3600;
     let lock_time = end_time - 10 * 60;
 
-    // ------------------------------------------------------------
-    // 3. Compute the REAL market_id for Solana (UNIQUE candle ID)
-    // ------------------------------------------------------------
-    let market_id = start_time; // USE timestamp as unique market identifier
+    // 3. Deterministic market_id (restart-safe)
+    let market_id = start_time;
 
-    // 4. Insert into DB → returns DB primary key ID (unused for blockchain)
-    let db_id = insert_market(
+    // 4. Insert into DB
+    let db_id = match insert_market(
         &pool,
-        market_id,                                   // FIXED
+        market_id,
         asset,
         Utc.timestamp_opt(start_time, 0).unwrap(),
         Utc.timestamp_opt(end_time, 0).unwrap(),
         Utc.timestamp_opt(lock_time, 0).unwrap(),
         open_price,
-    )
-    .await?;
+    ).await {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::warn!(
+                "[MARKET CREATE] DB insert skipped (likely duplicate): market_id={} err={}",
+                market_id,
+                e
+            );
+            return Ok(()); // idempotent behaviour
+        }
+    };
 
     tracing::info!(
         "[MARKET CREATE] DB Market Created: db_id={} | market_id={} | open={}",
@@ -71,7 +78,7 @@ async fn create_market_job(
             on_chain_price,
             start_time,
             end_time,
-            market_id as u64,          // FIXED - use REAL market_id
+            market_id as u64,
         )
     })
     .await;
@@ -103,8 +110,7 @@ async fn create_market_job(
 async fn settle_market_job(
     sol: Arc<SolanaClient>,
     pool: Pool<Postgres>,
-) -> Result<()> 
-{
+) -> Result<()> {
     let markets = get_expired_unsettled_markets(&pool).await?;
 
     if markets.is_empty() {
@@ -115,24 +121,36 @@ async fn settle_market_job(
     tracing::info!("[SETTLEMENT] Found {} markets to settle.", markets.len());
 
     for market in markets {
-        let market_id = market.market_id; // FIXED — not market.id
+        let market_id = market.market_id;
+
+        // 🔥 HARD GUARD: skip legacy / garbage markets
+        if market_id < 1_700_000_000 {
+            tracing::warn!(
+                "[SETTLEMENT] Skipping legacy market_id={} (pre-fix garbage)",
+                market_id
+            );
+            continue;
+        }
 
         tracing::info!(
             "[SETTLEMENT] Processing market_id={}",
             market_id
         );
 
-        // 1. Fetch new close candle
-        let candle_res = get_latest_candle(4).await;
-        if let Err(e) = candle_res {
-            tracing::error!(
-                "[SETTLEMENT] Oracle error for market {}: {:?}",
-                market_id, e
-            );
-            continue;
-        }
+        // 1. Fetch close candle
+        let candle = match get_latest_candle(4).await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!(
+                    "[SETTLEMENT] Oracle error for market {}: {:?}",
+                    market_id,
+                    e
+                );
+                continue;
+            }
+        };
 
-        let close_price = candle_res.unwrap().close;
+        let close_price = candle.close;
         let on_chain_price = (close_price * 100.0) as u64;
 
         // 2. Call Solana settle_market
@@ -146,7 +164,8 @@ async fn settle_market_job(
             Ok(Ok(sig)) => {
                 tracing::info!(
                     "[SETTLEMENT] On-chain settlement complete: market_id={} tx={}",
-                    market_id, sig
+                    market_id,
+                    sig
                 );
 
                 // 3. Update DB
@@ -166,7 +185,8 @@ async fn settle_market_job(
             Ok(Err(e)) => {
                 tracing::error!(
                     "[SETTLEMENT] On-chain settlement failed: market_id={} err={:?}",
-                    market_id, e
+                    market_id,
+                    e
                 );
             }
             Err(e) => tracing::error!("spawn_blocking error: {:?}", e),
@@ -182,8 +202,7 @@ async fn settle_market_job(
 pub async fn start_scheduler(
     sol: Arc<SolanaClient>,
     pool: Pool<Postgres>,
-) -> Result<()> 
-{
+) -> Result<()> {
     let sched = JobScheduler::new().await?;
 
     // Every 4 hours → create new market
