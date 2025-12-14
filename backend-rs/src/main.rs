@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::env; // Added for reading env vars directly
 
 use backend_rs::config::AppConfig;
 use backend_rs::scheduler;
@@ -77,8 +78,16 @@ async fn main() -> anyhow::Result<()> {
     // -------------------------------
     // START HTTP SERVER
     // -------------------------------
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    tracing::info!("HTTP server running at http://127.0.0.1:8080");
+    // FIX: Prioritize Render's PORT env var, fallback to config, then default to 8080
+    let port = env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(cfg.backend_port);
+
+    let addr = format!("0.0.0.0:{}", port);
+    
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    tracing::info!("HTTP server running at http://{}", addr);
 
     serve(listener, app).await?;
 
