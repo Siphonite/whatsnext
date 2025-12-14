@@ -1,4 +1,3 @@
-// backend-rs/src/solana_client.rs
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -24,10 +23,22 @@ pub struct SolanaClient {
 
 impl SolanaClient {
     pub fn new(cfg: &AppConfig) -> Result<Self> {
-        let payer = Arc::new(
-            read_keypair_file(&cfg.admin_keypair)
-                .map_err(|e| anyhow!("failed to read keypair {}: {}", cfg.admin_keypair, e))?,
-        );
+        // FIX: Handle both file path (local) and raw JSON content (production)
+        let payer = if cfg.admin_keypair.trim().starts_with('[') {
+            // It's a raw JSON array string (Production/Render)
+            let bytes: Vec<u8> = serde_json::from_str(&cfg.admin_keypair)
+                .map_err(|e| anyhow!("Failed to parse ADMIN_KEYPAIR as JSON: {}", e))?;
+            Arc::new(
+                Keypair::from_bytes(&bytes)
+                    .map_err(|e| anyhow!("Failed to create keypair from bytes: {}", e))?
+            )
+        } else {
+            // It's a file path (Local Development)
+            Arc::new(
+                read_keypair_file(&cfg.admin_keypair)
+                    .map_err(|e| anyhow!("failed to read keypair file {}: {}", cfg.admin_keypair, e))?,
+            )
+        };
 
         let cluster = Cluster::Custom(cfg.rpc_url.clone(), cfg.rpc_url.clone());
 
@@ -67,12 +78,11 @@ impl SolanaClient {
     }
 
     // -----------------------------------------------------------
-    // TREASURY INITIALIZATION - Manual instruction building
+    // TREASURY INITIALIZATION
     // -----------------------------------------------------------
     pub fn initialize_treasury_and_send(&self) -> Result<String> {
         let (treasury_pda, _bump) = self.derive_treasury_pda();
 
-        // Discriminator for initialize_treasury from IDL: [124, 186, 211, 195, 85, 165, 129, 166]
         let discriminator: [u8; 8] = [124, 186, 211, 195, 85, 165, 129, 166];
         
         let accounts = vec![
@@ -110,11 +120,12 @@ impl SolanaClient {
     }
 
     // -----------------------------------------------------------
-    // FUND TREASURY PDA WITH SOL
+    // FUND TREASURY
     // -----------------------------------------------------------
     pub fn fund_treasury_and_send(&self, lamports: u64) -> Result<String> {
         let (treasury_pda, _) = self.derive_treasury_pda();
 
+        #[allow(deprecated)]
         let ix = system_instruction::transfer(
             &self.payer.pubkey(),
             &treasury_pda,
@@ -144,7 +155,7 @@ impl SolanaClient {
     }
 
     // -----------------------------------------------------------
-    // CREATE MARKET - Manual instruction building
+    // CREATE MARKET
     // -----------------------------------------------------------
     pub fn create_market_and_send(
         &self,
@@ -155,10 +166,8 @@ impl SolanaClient {
     ) -> Result<String> {
         let (market_pda, _) = self.derive_market_pda(market_id);
 
-        // Discriminator for create_market from IDL: [103, 226, 97, 235, 200, 188, 251, 254]
         let mut data = vec![103, 226, 97, 235, 200, 188, 251, 254];
         
-        // Serialize arguments: asset (String), open_price (u64), start_time (i64), end_time (i64), market_id (u64)
         let asset = MARKET_ASSET.to_string();
         let asset_bytes = asset.as_bytes();
         data.extend_from_slice(&(asset_bytes.len() as u32).to_le_bytes());
@@ -203,7 +212,7 @@ impl SolanaClient {
     }
 
     // -----------------------------------------------------------
-    // SETTLE MARKET - Manual instruction building
+    // SETTLE MARKET
     // -----------------------------------------------------------
     pub fn settle_market_and_send(
         &self,
@@ -212,7 +221,6 @@ impl SolanaClient {
     ) -> Result<String> {
         let (market_pda, _) = self.derive_market_pda(market_id);
 
-        // Discriminator for settle_market from IDL: [193, 153, 95, 216, 166, 6, 144, 217]
         let mut data = vec![193, 153, 95, 216, 166, 6, 144, 217];
         data.extend_from_slice(&close_price.to_le_bytes());
 
