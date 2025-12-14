@@ -39,7 +39,10 @@ async fn create_market_job(
     let lock_time = end_time - 10 * 60;
 
     // 3. Deterministic market_id (restart-safe)
-    let market_id = start_time;
+    // FIX: Add a large offset (e.g. 70000) to ensure we don't collide with 
+    // old "Ghost Markets" from previous deployments on Devnet.
+    
+    let market_id = start_time + 7000;
 
     // 4. Insert into DB
     let db_id = match insert_market(
