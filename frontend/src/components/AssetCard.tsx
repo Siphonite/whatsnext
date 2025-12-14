@@ -9,6 +9,9 @@ import { useAnchorProgram } from "../hooks/useAnchorProgram";
 import { deriveMarketPDA, deriveUserBetPDA } from "../utils/pda";
 import * as anchor from "@coral-xyz/anchor";
 
+// 1. Import the Wallet Modal Hook
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+
 const AssetCard: React.FC = () => {
   const { asset, price } = useMarketStore();
   const { timeLeft } = useMarketTimerStore();
@@ -16,6 +19,8 @@ const AssetCard: React.FC = () => {
   const [chartKey, setChartKey] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // 2. Get the setVisible function
+  const { setVisible } = useWalletModal();
   const { program, walletPubkey, provider } = useAnchorProgram();
 
   const isLocked = useMemo(() => timeLeft <= 0, [timeLeft]);
@@ -32,19 +37,23 @@ const AssetCard: React.FC = () => {
   // -------------------------------
   const handleBet = async (side: "GREEN" | "RED") => {
     try {
+      // Check 1: Timer Lock
       if (isLocked) {
         alert("Betting is locked. Please wait for the next candle.");
         return;
       }
 
-      const amountFloat = Number(amount);
-      if (isNaN(amountFloat) || amountFloat <= 0) {
-        alert("Invalid amount");
+      // Check 2: Wallet Connection
+      // FIX: Instead of alerting, open the wallet modal automatically
+      if (!walletPubkey || !program || !provider) {
+        setVisible(true); 
         return;
       }
 
-      if (!program || !walletPubkey || !provider) {
-        alert("Connect your wallet first");
+      // Check 3: Valid Amount
+      const amountFloat = Number(amount);
+      if (isNaN(amountFloat) || amountFloat <= 0) {
+        alert("Invalid amount");
         return;
       }
 
@@ -65,17 +74,14 @@ const AssetCard: React.FC = () => {
 
       const market_id = currentMarket.market_id;
 
-      // 2) PDA Derivation - Your utils are correct
+      // 2) PDA Derivation
       const programId = program.programId;
       const [marketPDA] = deriveMarketPDA(programId, market_id);
       const [userBetPDA] = deriveUserBetPDA(programId, walletPubkey, marketPDA);
 
-      // 3) Convert amount to BN (Anchor prefers BN over BigInt)
+      // 3) Convert amount to BN
       const amountU64 = new anchor.BN(Math.round(amountFloat * 1_000_000));
 
-      // ---------------------------------------------------
-      // FIX: Anchor enum MUST be lowercase plain object
-      // ---------------------------------------------------
       const sideEnum = side === "GREEN" ? { green: {} } : { red: {} };
 
       console.log("♟ placeBet args:", {
@@ -100,6 +106,10 @@ const AssetCard: React.FC = () => {
       setAmount("");
     } catch (err: any) {
       console.error("Bet error:", err);
+      // User rejected request
+      if (err.message?.includes("User rejected")) {
+        return;
+      }
       alert("Bet failed: " + (err.message || err.toString()));
     } finally {
       setLoading(false);
