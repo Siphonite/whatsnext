@@ -4,10 +4,10 @@ import { useMarketStore } from "../store/useMarketStore";
 import { useMarketTimerStore } from "../store/useMarketTimerStore";
 import type { OHLCBar } from "../store/useOHLCStore";
 import type { UTCTimestamp } from "lightweight-charts";
+import { apiClient } from "../api/client"; // Import from axios client
 
 /**
  * Hook to fetch and sync OHLC candle data from backend.
- * This is the single source of truth for all chart data.
  */
 export const useOHLCFeed = () => {
   const { asset } = useMarketStore();
@@ -28,13 +28,11 @@ export const useOHLCFeed = () => {
   // Fetch historical OHLC data from backend
   const fetchOHLCData = async () => {
     try {
-      const response = await fetch(`/api/oracle/${encodeURIComponent(asset)}/historical?limit=200`);
+      // FIX: Use apiClient (axios) instead of fetch
+      // FIX: Remove '/api' prefix to match backend-rs/src/main.rs routes
+      const response = await apiClient.get(`/oracle/${encodeURIComponent(asset)}/historical?limit=200`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch OHLC data: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = response.data; // Axios stores body in .data
       
       if (data.error) {
         throw new Error(data.error);
@@ -49,20 +47,16 @@ export const useOHLCFeed = () => {
       setCandles(transformed, asset);
     } catch (error) {
       console.error("Failed to fetch OHLC data:", error);
-      // Don't set empty data, keep existing candles
     }
   };
 
   // Fetch current candle update
   const fetchCurrentCandle = async () => {
     try {
-      const response = await fetch(`/api/oracle/${encodeURIComponent(asset)}`);
+      // FIX: Use apiClient and remove '/api' prefix
+      const response = await apiClient.get(`/oracle/${encodeURIComponent(asset)}`);
       
-      if (!response.ok) {
-        return; // Silently fail, don't break the chart
-      }
-
-      const data = await response.json();
+      const data = response.data;
       
       if (data.error || !data.timestamp) {
         return;
@@ -86,7 +80,6 @@ export const useOHLCFeed = () => {
   // Reload when timer hits 0 (candle closes)
   useEffect(() => {
     if (timeLeft <= 0) {
-      // Candle closed, reload all data
       fetchOHLCData();
     }
   }, [timeLeft]);
@@ -94,11 +87,10 @@ export const useOHLCFeed = () => {
   // Poll for current candle updates every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      // Only update if we're in an active candle (timeLeft > 0)
       if (timeLeft > 0) {
         fetchCurrentCandle();
       }
-    }, 10000); // 10 seconds
+    }, 10000); 
 
     return () => clearInterval(interval);
   }, [asset, timeLeft]);
@@ -108,4 +100,3 @@ export const useOHLCFeed = () => {
     refresh: fetchOHLCData,
   };
 };
-
