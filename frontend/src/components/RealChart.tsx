@@ -11,7 +11,7 @@ const RealChart: React.FC = () => {
   const candleSeriesRef = useRef<any>(null);
 
   // Single asset from your store
-  const { asset, tvSymbol, price } = useMarketStore();
+  const { asset, tvSymbol } = useMarketStore(); // removed unused `price`
 
   // -----------------------------
   // 1. INIT CHART + LOAD HISTORY
@@ -19,7 +19,6 @@ const RealChart: React.FC = () => {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Get current container dimensions
     const { clientWidth, clientHeight } = containerRef.current;
 
     const chart = createChart(containerRef.current, {
@@ -32,7 +31,7 @@ const RealChart: React.FC = () => {
         horzLines: { color: "#1f1f1f" },
       },
       width: clientWidth,
-      height: clientHeight, // Dynamically use available height
+      height: clientHeight,
       crosshair: { mode: 0 },
       timeScale: {
         borderColor: "#222",
@@ -54,10 +53,9 @@ const RealChart: React.FC = () => {
 
     candleSeriesRef.current = candleSeries;
 
-    // Fetch historical candles
+    // Fetch historical candles from backend
     const fetchHistorical = async () => {
       try {
-        // Prefer BACKEND candles (more accurate for WhatsNext)
         const backendURL = `/api/prices/${asset}`;
         const backendRes = await fetch(backendURL);
 
@@ -74,13 +72,13 @@ const RealChart: React.FC = () => {
             }));
 
             candleSeries.setData(formatted);
-            return; // done
+            return;
           }
         }
 
-        // NO FALLBACK - Backend is the only source of truth
-        // If backend fails, chart will remain empty until backend is available
-        console.warn("Backend OHLC endpoint unavailable. Chart will remain empty.");
+        console.warn(
+          "Backend OHLC endpoint unavailable. Chart will remain empty."
+        );
       } catch (err) {
         console.error("Historical candle load failed:", err);
       }
@@ -88,14 +86,13 @@ const RealChart: React.FC = () => {
 
     fetchHistorical();
 
-    // Responsive Resize
-    // This ensures the chart resizes BOTH width AND height
+    // Responsive resize (width + height)
     const resizeObserver = new ResizeObserver((entries) => {
-      if (!entries || entries.length === 0) return;
+      if (!entries.length) return;
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
     });
-    
+
     resizeObserver.observe(containerRef.current);
 
     return () => {
@@ -104,19 +101,15 @@ const RealChart: React.FC = () => {
     };
   }, [asset, tvSymbol]);
 
-  // NOTE: Tick-based candle updates removed.
-  // Candles must come exclusively from backend OHLC feed.
-  // Price ticks are only for spot price display, not chart data.
-
   return (
     <div
       ref={containerRef}
       className="real-chart-container"
       style={{
         width: "100%",
-        height: "100%", // Fill the flex parent
+        height: "100%",
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
       }}
     />
   );
