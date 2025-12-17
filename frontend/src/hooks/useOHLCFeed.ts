@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useOHLCStore } from "../store/useOHLCStore";
 import { useMarketStore } from "../store/useMarketStore";
 import { useMarketTimerStore } from "../store/useMarketTimerStore";
@@ -13,6 +13,7 @@ export const useOHLCFeed = () => {
   const { asset } = useMarketStore();
   const { timeLeft } = useMarketTimerStore();
   const { setCandles, updateCurrentCandle, reset, getAllCandles } = useOHLCStore();
+  const prevAssetRef = useRef<string | null>(null);
 
   // Transform backend candle format to TradingView format
   const transformCandle = (c: any): OHLCBar => {
@@ -31,9 +32,9 @@ export const useOHLCFeed = () => {
       // FIX: Use apiClient (axios) instead of fetch
       // FIX: Remove '/api' prefix to match backend-rs/src/main.rs routes
       const response = await apiClient.get(`/oracle/${encodeURIComponent(asset)}/historical?limit=200`);
-      
+
       const data = response.data; // Axios stores body in .data
-      
+
       if (data.error) {
         throw new Error(data.error);
       }
@@ -47,6 +48,7 @@ export const useOHLCFeed = () => {
       setCandles(transformed, asset);
     } catch (error) {
       console.error("Failed to fetch OHLC data:", error);
+      // Don't reset on error - keep showing previous data
     }
   };
 
@@ -55,9 +57,9 @@ export const useOHLCFeed = () => {
     try {
       // FIX: Use apiClient and remove '/api' prefix
       const response = await apiClient.get(`/oracle/${encodeURIComponent(asset)}`);
-      
+
       const data = response.data;
-      
+
       if (data.error || !data.timestamp) {
         return;
       }
@@ -73,7 +75,11 @@ export const useOHLCFeed = () => {
 
   // Initial load and on asset change
   useEffect(() => {
-    reset(); // Clear old data when asset changes
+    // Only reset if asset actually changed (not on re-render)
+    if (prevAssetRef.current !== null && prevAssetRef.current !== asset) {
+      reset(); // Clear old data when asset changes
+    }
+    prevAssetRef.current = asset;
     fetchOHLCData();
   }, [asset]);
 
@@ -90,7 +96,7 @@ export const useOHLCFeed = () => {
       if (timeLeft > 0) {
         fetchCurrentCandle();
       }
-    }, 10000); 
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [asset, timeLeft]);

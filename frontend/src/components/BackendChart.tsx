@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   createChart,
   ColorType,
@@ -20,11 +20,15 @@ const BackendChart: React.FC<Props> = ({ containerId = "backend-chart" }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const [isChartReady, setIsChartReady] = useState(false);
   const { candles } = useOHLCFeed();
 
   // Initialize chart
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Reset ready state during initialization
+    setIsChartReady(false);
 
     // Get current container dimensions
     const { clientWidth, clientHeight } = containerRef.current;
@@ -63,6 +67,9 @@ const BackendChart: React.FC<Props> = ({ containerId = "backend-chart" }) => {
 
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
+    
+    // Mark chart as ready after refs are assigned
+    setIsChartReady(true);
 
     // Responsive resize
     const resizeObserver = new ResizeObserver((entries) => {
@@ -80,12 +87,13 @@ const BackendChart: React.FC<Props> = ({ containerId = "backend-chart" }) => {
         chartRef.current = null;
       }
       candleSeriesRef.current = null;
+      setIsChartReady(false);
     };
   }, []);
 
-  // Update chart data when candles change
+  // Update chart data when candles change OR when chart becomes ready
   useEffect(() => {
-    if (!candleSeriesRef.current || !candles || candles.length === 0) {
+    if (!isChartReady || !candleSeriesRef.current || !candles || candles.length === 0) {
       return;
     }
 
@@ -96,18 +104,64 @@ const BackendChart: React.FC<Props> = ({ containerId = "backend-chart" }) => {
     if (chartRef.current && candles.length > 0) {
       chartRef.current.timeScale().fitContent();
     }
-  }, [candles]);
+  }, [candles, isChartReady]);
+
+  const showLoading = !isChartReady || candles.length === 0;
 
   return (
     <div
-      id={containerId}
-      ref={containerRef}
       style={{
+        position: "relative",
         width: "100%",
         height: "100%",
         minHeight: 420,
       }}
-    />
+    >
+      <div
+        id={containerId}
+        ref={containerRef}
+        style={{
+          width: "100%",
+          height: "100%",
+        }}
+      />
+      {showLoading && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(10, 10, 10, 0.8)",
+            zIndex: 10,
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                border: "3px solid #333",
+                borderTopColor: "#22c55e",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+                margin: "0 auto 12px",
+              }}
+            />
+            <span style={{ color: "#888", fontSize: 14 }}>Loading chart...</span>
+          </div>
+        </div>
+      )}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
   );
 };
 
