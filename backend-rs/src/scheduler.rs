@@ -11,6 +11,7 @@ use crate::repository::{
     insert_market,
     update_market_settlement,
     get_expired_unsettled_markets,
+    get_active_markets,
 };
 
 /// ---------------------------------------------------------------------------
@@ -105,6 +106,39 @@ async fn create_market_job(
     }
 
     Ok(())
+}
+
+/// ---------------------------------------------------------------------------
+/// CREATE INITIAL MARKET (called on server startup)
+/// ---------------------------------------------------------------------------
+/// Checks if an active market exists. If not, creates one immediately.
+/// This ensures users can place bets right after deployment.
+pub async fn create_initial_market(
+    sol: Arc<SolanaClient>,
+    pool: Pool<Postgres>,
+) -> Result<()> {
+    tracing::info!("[STARTUP] Checking for active markets...");
+    
+    // Check if active market exists
+    let active = match get_active_markets(&pool).await {
+        Ok(markets) => markets,
+        Err(e) => {
+            tracing::error!("[STARTUP] Failed to query active markets: {:?}", e);
+            return Err(e);
+        }
+    };
+    
+    if !active.is_empty() {
+        tracing::info!(
+            "[STARTUP] Active market already exists (market_id={}), skipping creation.",
+            active[0].market_id
+        );
+        return Ok(());
+    }
+    
+    // No active market - create one now
+    tracing::info!("[STARTUP] No active market found, creating one now...");
+    create_market_job(sol, pool).await
 }
 
 /// ---------------------------------------------------------------------------

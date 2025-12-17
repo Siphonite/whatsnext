@@ -43,6 +43,14 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // -------------------------------
+    // CREATE INITIAL MARKET ON STARTUP
+    // -------------------------------
+    // Ensure a market exists immediately after deployment
+    if let Err(e) = scheduler::create_initial_market(sol.clone(), pool.clone()).await {
+        tracing::warn!("Initial market creation failed (may already exist): {:?}", e);
+    }
+
+    // -------------------------------
     // START SCHEDULER
     // -------------------------------
     tokio::spawn({
